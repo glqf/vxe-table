@@ -1,9 +1,401 @@
 import { watch, reactive } from 'vue'
 import XEUtils from 'xe-utils'
 import { ColumnInfo } from './columnInfo'
-import { isPx, isScale } from '../../ui/src/dom'
+import { isPx, isScale, queryElement } from '../../ui/src/dom'
+import { eqEmptyValue } from '../../ui/src/utils'
 
-import type { VxeTableConstructor, VxeTablePrivateMethods, VxeTableDefines } from '../../../types'
+import type { VxeTableConstructor, VxeTablePrivateMethods, VxeTableDefines, VxeTablePropTypes, TableReactData, TableInternalData } from '../../../types'
+
+export function createInternalData (): TableInternalData {
+  return {
+    tZindex: 0,
+    currKeyField: '',
+    isCurrDeepKey: false,
+    elemStore: {},
+    // 存放横向 X 虚拟滚动相关的信息
+    scrollXStore: {
+      preloadSize: 0,
+      offsetSize: 0,
+      visibleSize: 0,
+      visibleStartIndex: 0,
+      visibleEndIndex: 0,
+      startIndex: 0,
+      endIndex: 0
+    },
+    // 存放纵向 Y 虚拟滚动相关信息
+    scrollYStore: {
+      preloadSize: 0,
+      offsetSize: 0,
+      visibleSize: 0,
+      visibleStartIndex: 0,
+      visibleEndIndex: 0,
+      startIndex: 0,
+      endIndex: 0
+    },
+    // 表格宽度
+    tableWidth: 0,
+    // 表格高度
+    tableHeight: 0,
+    customHeight: 0,
+    customMinHeight: 0,
+    customMaxHeight: 0,
+    // 当前 hover 行
+    hoverRow: null,
+    // 最后滚动位置
+    lastScrollLeft: 0,
+    lastScrollTop: 0,
+    // 单选框属性，已选中保留的行
+    radioReserveRow: null,
+    // 复选框属性，已选中保留的行集合
+    checkboxReserveRowMap: {},
+    // 行数据，已展开保留的行集合
+    rowExpandedReserveRowMap: {},
+    // 树结构数据，已展开保留的行集合
+    treeExpandedReserveRowMap: {},
+    // 树结构数据，不确定状态的集合
+    treeIndeterminateRowMaps: {},
+    // 列表完整数据、条件处理后
+    tableFullData: [],
+    afterFullData: [],
+    afterTreeFullData: [],
+    afterGroupFullData: [],
+    // 列表条件处理后数据集合
+    afterFullRowMaps: {},
+    // 树结构完整数据、条件处理后
+    tableFullTreeData: [],
+    // 行分组全量数据、条件处理后
+    tableFullGroupData: [],
+    tableSynchData: [],
+    tableSourceData: [],
+    // 收集的列配置（带分组）
+    collectColumn: [],
+    // 完整所有列（不带分组）
+    tableFullColumn: [],
+    // 渲染所有列
+    visibleColumn: [],
+
+    // 全量数据集（包括当前和已删除）
+    fullAllDataRowIdData: {},
+    // 数据集（仅当前）
+    fullDataRowIdData: {},
+    // 数据集（仅可视）
+    visibleDataRowIdData: {},
+
+    footerFullDataRowData: {},
+
+    // 渲染中缓存数据
+    sourceDataRowIdData: {},
+    fullColumnIdData: {},
+    fullColumnFieldData: {},
+
+    // 合并表头单元格的数据
+    mergeHeaderList: [],
+    mergeHeaderMaps: {},
+    // 已合并单元格数据集合
+    mergeHeaderCellMaps: {},
+    // 合并单元格的数据
+    mergeBodyList: [],
+    mergeBodyMaps: {},
+    // 已合并单元格数据集合
+    mergeBodyCellMaps: {},
+    // 合并表尾的数据
+    mergeFooterList: [],
+    mergeFooterMaps: {},
+    // 已合并表尾数据集合
+    mergeFooterCellMaps: {},
+
+    // 已展开的行集合
+    rowExpandedMaps: {},
+    // 懒加载中的展开行的集合
+    rowExpandLazyLoadedMaps: {},
+    // 已展开的分组行
+    rowGroupExpandedMaps: {},
+    // 已展开树节点集合
+    treeExpandedMaps: {},
+    // 懒加载中的树节点的集合
+    treeExpandLazyLoadedMaps: {},
+    // 复选框属性，已选中的行集合
+    selectCheckboxMaps: {},
+    // 已标记的对象集
+    pendingRowMaps: {},
+    // 已新增的临时行
+    insertRowMaps: {},
+    // 已删除行
+    removeRowMaps: {},
+
+    cvCacheMaps: {},
+
+    // 表头高度
+    tHeaderHeight: 0,
+    // 表体高度
+    tBodyHeight: 0,
+    // 表尾高度
+    tFooterHeight: 0,
+
+    teleportToWrapperElem: null,
+    popupToWrapperElem: null,
+
+    inited: false,
+    tooltipTimeout: null,
+    initStatus: false,
+    isActivated: false
+  }
+}
+
+export function createReactData (): TableReactData {
+  return {
+    // 低性能的静态列
+    staticColumns: [],
+    // 渲染的列分组
+    tableGroupColumn: [],
+    // 可视区渲染的列
+    tableColumn: [],
+    // 渲染中的数据
+    tableData: [],
+    // 是否启用了横向 X 可视渲染方式加载
+    scrollXLoad: false,
+    // 是否启用了纵向 Y 可视渲染方式加载
+    scrollYLoad: false,
+    // 是否存在纵向滚动条
+    overflowY: true,
+    // 是否存在横向滚动条
+    overflowX: false,
+    // 纵向滚动条的宽度
+    scrollbarWidth: 0,
+    // 横向滚动条的高度
+    scrollbarHeight: 0,
+    // 最后滚动时间戳
+    lastScrollTime: 0,
+    // 行高
+    rowHeight: 0,
+    // 表格父容器的高度
+    parentHeight: 0,
+    // 是否使用分组表头
+    isGroup: false,
+    isAllOverflow: false,
+    // 复选框属性，是否全选
+    isAllSelected: false,
+    // 复选框属性，有选中且非全选状态
+    isIndeterminate: false,
+    // 当前行
+    currentRow: null,
+    // 单选框属性，选中列
+    currentColumn: null,
+    // 单选框属性，选中行
+    selectRadioRow: null,
+    // 表尾合计数据
+    footerTableData: [],
+    // 行分组列信息
+    rowGroupColumn: null,
+    // 展开列信息
+    expandColumn: null,
+    checkboxColumn: null,
+    radioColumn: null,
+    // 树节点列信息
+    treeNodeColumn: null,
+    hasFixedColumn: false,
+    // 刷新列标识，当列筛选被改变时，触发表格刷新数据
+    upDataFlag: 0,
+    // 刷新列标识，当列的特定属性被改变时，触发表格刷新列
+    reColumnFlag: 0,
+    // 初始化标识
+    initStore: {
+      filter: false,
+      import: false,
+      export: false,
+      custom: false
+    },
+    // 自定义列相关的信息
+    customStore: {
+      btnEl: null,
+      isAll: false,
+      isIndeterminate: false,
+      activeBtn: false,
+      activeWrapper: false,
+      visible: false,
+      maxHeight: null,
+      popupTop: 0,
+      oldSortMaps: {},
+      oldFixedMaps: {},
+      oldVisibleMaps: {}
+    },
+    customColumnList: [],
+    // 当前选中的筛选列
+    filterStore: {
+      isAllSelected: false,
+      isIndeterminate: false,
+      style: null,
+      column: null,
+      visible: false,
+      maxHeight: null
+    },
+    // 存放列相关的信息
+    columnStore: {
+      leftList: [],
+      centerList: [],
+      rightList: [],
+      resizeList: [],
+      pxList: [],
+      pxMinList: [],
+      autoMinList: [],
+      scaleList: [],
+      scaleMinList: [],
+      autoList: [],
+      remainList: []
+    },
+    // 存放快捷菜单的信息
+    ctxMenuStore: {
+      selected: null,
+      visible: false,
+      showChild: false,
+      selectChild: null,
+      list: [],
+      style: null
+    },
+    // 存放可编辑相关信息
+    editStore: {
+      indexs: {
+        columns: []
+      },
+      titles: {
+        columns: []
+      },
+      // 选中源
+      selected: {
+        row: null,
+        column: null
+      },
+      // 已复制源
+      copyed: {
+        cut: false,
+        rows: [],
+        columns: []
+      },
+      // 激活
+      actived: {
+        row: null,
+        column: null
+      },
+      // 当前被强制聚焦单元格，只会在鼠标点击后算聚焦
+      focused: {
+        row: null,
+        column: null
+      }
+    },
+    // 存放 tooltip 相关信息
+    tooltipStore: {
+      row: null,
+      column: null,
+      content: null,
+      visible: false,
+      type: null,
+      currOpts: {}
+    },
+    // 存放数据校验相关信息
+    validStore: {
+      visible: false
+    },
+    validErrorMaps: {},
+    // 导入相关信息
+    importStore: {
+      inited: false,
+      file: null,
+      type: '',
+      modeList: [],
+      typeList: [],
+      filename: '',
+      visible: false
+    },
+    importParams: {
+      mode: '',
+      types: null,
+      message: true
+    },
+    // 导出相关信息
+    exportStore: {
+      inited: false,
+      name: '',
+      modeList: [],
+      typeList: [],
+      columns: [],
+      isPrint: false,
+      hasFooter: false,
+      hasMerge: false,
+      hasTree: false,
+      hasColgroup: false,
+      visible: false
+    },
+    exportParams: {
+      filename: '',
+      sheetName: '',
+      mode: '',
+      type: '',
+      isColgroup: false,
+      isMerge: false,
+      isAllExpand: false,
+      useStyle: false,
+      original: false,
+      message: true,
+      isHeader: false,
+      isTitle: false,
+      isFooter: false
+    },
+
+    visiblwRowsFlag: 1,
+
+    isRowGroupStatus: false,
+    rowGroupList: [],
+    aggHandleFields: [],
+    aggHandleAggColumns: [],
+
+    rowGroupExpandedFlag: 1,
+    rowExpandedFlag: 1,
+    treeExpandedFlag: 1,
+    updateCheckboxFlag: 1,
+    pendingRowFlag: 1,
+    insertRowFlag: 1,
+    removeRowFlag: 1,
+
+    mergeHeadFlag: 1,
+    mergeBodyFlag: 1,
+    mergeFootFlag: 1,
+
+    rowHeightStore: {
+      large: 52,
+      default: 48,
+      medium: 44,
+      small: 40,
+      mini: 36
+    },
+
+    scrollVMLoading: false,
+    scrollYHeight: 0,
+    scrollYTop: 0,
+    isScrollYBig: false,
+    scrollXLeft: 0,
+    scrollXWidth: 0,
+    isScrollXBig: false,
+
+    lazScrollLoading: false,
+
+    rowExpandHeightFlag: 1,
+    calcCellHeightFlag: 1,
+    resizeHeightFlag: 1,
+    resizeWidthFlag: 1,
+
+    isCustomStatus: false,
+
+    isCrossDragRow: false,
+    dragRow: null,
+    isCrossDragCol: false,
+    dragCol: null,
+    dragTipText: '',
+
+    isDragResize: false,
+    isRowLoading: false,
+    isColLoading: false
+  }
+}
 
 const getAllConvertColumns = (columns: any, parentColumn?: any) => {
   const result: any[] = []
@@ -68,33 +460,88 @@ export const convertHeaderColumnToRows = (originColumns: any): any[][] => {
   return rows
 }
 
-export interface XEBodyScrollElement extends HTMLDivElement {
-  _onscroll: ((evnt: Event) => void) | null;
+export function convertHeaderToGridRows (spanColumns: VxeTableDefines.ColumnInfo[][]) {
+  const rSize = spanColumns.length
+  const cSize = spanColumns[0].reduce((sum, cell) => sum + cell.colSpan, 0)
+
+  const occupiedRows: boolean[][] = []
+  const fullRows: any[][] = []
+  for (let rIndex = 0; rIndex < rSize; rIndex++) {
+    const oCols: boolean[] = []
+    const dCols: string[] = []
+    for (let cIndex = 0; cIndex < cSize; cIndex++) {
+      oCols.push(false)
+      dCols.push('')
+    }
+    occupiedRows.push(oCols)
+    fullRows.push(dCols)
+  }
+
+  for (let rIndex = 0; rIndex < rSize; rIndex++) {
+    let currColIndex = 0
+    for (const column of spanColumns[rIndex]) {
+      const { colSpan, rowSpan } = column
+      let startColIndex = -1
+      for (let ccIndex = currColIndex; ccIndex <= cSize - colSpan; ccIndex++) {
+        let oFlag = true
+        for (let csIndex = 0; csIndex < colSpan; csIndex++) {
+          if (occupiedRows[rIndex][ccIndex + csIndex]) {
+            oFlag = false
+            break
+          }
+        }
+        if (oFlag) {
+          startColIndex = ccIndex
+          break
+        }
+      }
+      if (startColIndex === -1) {
+        for (let j = 0; j <= cSize - colSpan; j++) {
+          let oFlag = true
+          for (let k = 0; k < colSpan; k++) {
+            if (occupiedRows[rIndex][j + k]) {
+              oFlag = false
+              break
+            }
+          }
+          if (oFlag) {
+            startColIndex = j
+            break
+          }
+        }
+        if (startColIndex === -1) {
+          // error
+          break
+        }
+      }
+
+      for (let srIndex = rIndex; srIndex < rIndex + rowSpan; srIndex++) {
+        for (let scIndex = startColIndex; scIndex < startColIndex + colSpan; scIndex++) {
+          occupiedRows[srIndex][scIndex] = true
+          fullRows[srIndex][scIndex] = column
+        }
+      }
+      currColIndex = startColIndex + colSpan
+    }
+  }
+  return fullRows
 }
 
 export function restoreScrollLocation ($xeTable: VxeTableConstructor, scrollLeft: number, scrollTop: number) {
-  const { internalData } = $xeTable
-  return $xeTable.clearScroll().then(() => {
-    if (scrollLeft || scrollTop) {
-      // 重置最后滚动状态
-      internalData.lastScrollLeft = 0
-      internalData.lastScrollTop = 0
-      // 还原滚动状态
-      return $xeTable.scrollTo(scrollLeft, scrollTop)
-    }
-  })
-}
+  const internalData = $xeTable.internalData
 
-export function removeScrollListener (scrollElem: XEBodyScrollElement | null) {
-  if (scrollElem && scrollElem._onscroll) {
-    scrollElem.onscroll = null
+  if (scrollLeft || scrollTop) {
+    internalData.intoRunScroll = false
+    internalData.inVirtualScroll = false
+    internalData.inWheelScroll = false
+    internalData.inHeaderScroll = false
+    internalData.inBodyScroll = false
+    internalData.inFooterScroll = false
+    internalData.scrollRenderType = ''
+    // 还原滚动状态
+    return $xeTable.scrollTo(scrollLeft, scrollTop)
   }
-}
-
-export function restoreScrollListener (scrollElem: XEBodyScrollElement | null) {
-  if (scrollElem && scrollElem._onscroll) {
-    scrollElem.onscroll = scrollElem._onscroll
-  }
+  return $xeTable.clearScroll()
 }
 
 /**
@@ -104,30 +551,99 @@ export function getRowUniqueId () {
   return XEUtils.uniqueId('row_')
 }
 
+export function hasDeepKey (rowKey: string) {
+  return rowKey.indexOf('.') > -1
+}
+
 // 行主键 key
 export function getRowkey ($xeTable: VxeTableConstructor) {
-  const { props } = $xeTable
-  const { computeRowOpts } = $xeTable.getComputeMaps()
-  const { rowId } = props
-  const rowOpts = computeRowOpts.value
-  return rowId || rowOpts.keyField || '_X_ROW_KEY'
+  const { currKeyField } = $xeTable.internalData
+  return currKeyField
 }
 
 // 行主键 value
 export function getRowid ($xeTable: VxeTableConstructor, row: any) {
-  const rowid = XEUtils.get(row, getRowkey($xeTable))
-  return XEUtils.eqNull(rowid) ? '' : encodeURIComponent(rowid)
+  const internalData = $xeTable.internalData
+  const { isCurrDeepKey, currKeyField } = internalData
+  return row ? encodeRowid((isCurrDeepKey ? getDeepRowIdByKey : getFastRowIdByKey)(row, currKeyField)) : ''
+}
+
+export function createHandleUpdateRowId ($xeTable: VxeTableConstructor) {
+  const internalData = $xeTable.internalData
+  const { isCurrDeepKey, currKeyField } = internalData
+  const updateRId = isCurrDeepKey ? updateDeepRowKey : updateFastRowKey
+  return {
+    rowKey: currKeyField,
+    handleUpdateRowId (row: any) {
+      return row ? updateRId(row, currKeyField) : ''
+    }
+  }
+}
+
+export function createHandleGetRowId ($xeTable: VxeTableConstructor) {
+  const internalData = $xeTable.internalData
+  const { isCurrDeepKey, currKeyField } = internalData
+  const getRId = isCurrDeepKey ? getDeepRowIdByKey : getFastRowIdByKey
+  return {
+    rowKey: currKeyField,
+    handleGetRowId (row: any) {
+      return row ? encodeRowid(getRId(row, currKeyField)) : ''
+    }
+  }
+}
+
+// 编码行主键
+export function encodeRowid (rowVal: string) {
+  return XEUtils.eqNull(rowVal) ? '' : encodeURIComponent(rowVal)
+}
+
+function getDeepRowIdByKey (row: any, rowKey: string) {
+  return XEUtils.get(row, rowKey)
+}
+
+export function updateDeepRowKey (row: any, rowKey: string) {
+  let rowid = encodeRowid(getDeepRowIdByKey(row, rowKey))
+  if (eqEmptyValue(rowid)) {
+    rowid = getRowUniqueId()
+    XEUtils.set(row, rowKey, rowid)
+  }
+  return rowid
+}
+
+function getFastRowIdByKey (row: any, rowKey: string) {
+  return row[rowKey]
+}
+
+export function updateFastRowKey (row: any, rowKey: string) {
+  let rowid = encodeRowid(getFastRowIdByKey(row, rowKey))
+  if (eqEmptyValue(rowid)) {
+    rowid = getRowUniqueId()
+    row[rowKey] = rowid
+  }
+  return rowid
 }
 
 export interface XEColumnInstance {
-  column: ColumnInfo;
+  columnConfig: ColumnInfo;
 }
 
-export const handleFieldOrColumn = ($xeTable: VxeTableConstructor, fieldOrColumn: string | VxeTableDefines.ColumnInfo | null) => {
+export function handleFieldOrColumn ($xeTable: VxeTableConstructor, fieldOrColumn: string | VxeTableDefines.ColumnInfo | null) {
   if (fieldOrColumn) {
-    return XEUtils.isString(fieldOrColumn) ? $xeTable.getColumnByField(fieldOrColumn) : fieldOrColumn
+    return XEUtils.isString(fieldOrColumn) || XEUtils.isNumber(fieldOrColumn) ? $xeTable.getColumnByField(`${fieldOrColumn}`) : fieldOrColumn
   }
   return null
+}
+
+export function handleRowidOrRow ($xeTable: VxeTableConstructor, rowidOrRow: any) {
+  if (rowidOrRow) {
+    const rowid = XEUtils.isString(rowidOrRow) || XEUtils.isNumber(rowidOrRow) ? rowidOrRow : getRowid($xeTable, rowidOrRow)
+    return $xeTable.getRowById(rowid)
+  }
+  return null
+}
+
+export function getCellRestHeight (rowRest: VxeTableDefines.RowCacheItem, cellOpts: VxeTablePropTypes.CellConfig, rowOpts: VxeTablePropTypes.RowConfig, defaultRowHeight: number) {
+  return rowRest.resizeHeight || cellOpts.height || rowOpts.height || rowRest.height || defaultRowHeight
 }
 
 function getPaddingLeftRightSize (elem: HTMLElement | null) {
@@ -140,7 +656,7 @@ function getPaddingLeftRightSize (elem: HTMLElement | null) {
   return 0
 }
 
-function getElemenMarginWidth (elem: HTMLElement | null) {
+function getElementMarginAndWidth (elem: HTMLElement | null) {
   if (elem) {
     const computedStyle = getComputedStyle(elem)
     const marginLeft = XEUtils.toNumber(computedStyle.marginLeft)
@@ -150,15 +666,14 @@ function getElemenMarginWidth (elem: HTMLElement | null) {
   return 0
 }
 
-function queryCellElement (cell: HTMLTableCellElement, selector: string) {
-  return cell.querySelector('.vxe-cell' + selector) as HTMLElement | null
-}
-
-export function toFilters (filters: any) {
-  if (filters && XEUtils.isArray(filters)) {
-    return filters.map(({ label, value, data, resetValue, checked }) => {
-      return { label, value, data, resetValue, checked: !!checked, _checked: !!checked }
-    })
+export function toFilters (filters: any, colid?: string) {
+  if (filters) {
+    if (XEUtils.isArray(filters)) {
+      return filters.map(({ label, value, data, resetValue, checked }) => {
+        return { label, value, data, resetValue, checked: !!checked, _checked: !!checked, _colId: colid }
+      })
+    }
+    return []
   }
   return filters
 }
@@ -173,6 +688,23 @@ export function getCellValue (row: any, column: VxeTableDefines.ColumnInfo) {
 
 export function setCellValue (row: any, column: VxeTableDefines.ColumnInfo, value: any) {
   return XEUtils.set(row, column.field, value)
+}
+
+export function getRefElem (refEl: any) {
+  if (refEl) {
+    const rest = refEl.value
+    if (rest) {
+      return (rest.$el || rest) as HTMLElement
+    }
+  }
+  return null
+}
+
+export function getCalcHeight (height: number | 'unset' | undefined | null) {
+  if (height === 'unset') {
+    return 0
+  }
+  return height || 0
 }
 
 /**
@@ -216,7 +748,8 @@ export function getColReMinWidth (params: {
   cell: HTMLTableCellElement;
 }) {
   const { $table, column, cell } = params
-  const { props: tableProps } = $table
+  const tableProps = $table.props
+  const internalData = $table.internalData
   const { computeResizableOpts } = $table.getComputeMaps()
   const resizableOpts = computeResizableOpts.value
   const { minWidth: reMinWidth } = resizableOpts
@@ -227,6 +760,7 @@ export function getColReMinWidth (params: {
       return Math.max(1, XEUtils.toNumber(customMinWidth))
     }
   }
+  const { elemStore } = internalData
   const { showHeaderOverflow: allColumnHeaderOverflow } = tableProps
   const { showHeaderOverflow, minWidth: colMinWidth } = column
   const headOverflow = XEUtils.isUndefined(showHeaderOverflow) || XEUtils.isNull(showHeaderOverflow) ? allColumnHeaderOverflow : showHeaderOverflow
@@ -234,28 +768,27 @@ export function getColReMinWidth (params: {
   const showTitle = headOverflow === 'title'
   const showTooltip = headOverflow === true || headOverflow === 'tooltip'
   const hasEllipsis = showTitle || showTooltip || showEllipsis
-  const minTitleWidth = XEUtils.floor((XEUtils.toNumber(getComputedStyle(cell).fontSize) || 14) * 1.6)
-  const paddingLeftRight = getPaddingLeftRightSize(cell) + getPaddingLeftRightSize(queryCellElement(cell, ''))
+  const minTitleWidth = XEUtils.floor((XEUtils.toNumber(getComputedStyle(cell).fontSize) || 14) * 1.8)
+  const paddingLeftRight = getPaddingLeftRightSize(cell) + getPaddingLeftRightSize(queryElement(cell, '.vxe-cell'))
   let mWidth = minTitleWidth + paddingLeftRight
   // 默认最小宽处理
   if (hasEllipsis) {
-    const checkboxIconWidth = getPaddingLeftRightSize(queryCellElement(cell, '--title>.vxe-cell--checkbox'))
-    const requiredIconWidth = getElemenMarginWidth(queryCellElement(cell, '>.vxe-cell--required-icon'))
-    const editIconWidth = getElemenMarginWidth(queryCellElement(cell, '>.vxe-cell--edit-icon'))
-    const prefixIconWidth = getElemenMarginWidth(queryCellElement(cell, '>.vxe-cell-title-prefix-icon'))
-    const suffixIconWidth = getElemenMarginWidth(queryCellElement(cell, '>.vxe-cell-title-suffix-icon'))
-    const sortIconWidth = getElemenMarginWidth(queryCellElement(cell, '>.vxe-cell--sort'))
-    const filterIconWidth = getElemenMarginWidth(queryCellElement(cell, '>.vxe-cell--filter'))
-    mWidth += checkboxIconWidth + requiredIconWidth + editIconWidth + prefixIconWidth + suffixIconWidth + filterIconWidth + sortIconWidth
+    const dragIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell--drag-handle'))
+    const checkboxIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell--checkbox'))
+    const requiredIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell--required-icon'))
+    const editIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell--edit-icon'))
+    const prefixIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell-title-prefix-icon'))
+    const suffixIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell-title-suffix-icon'))
+    const sortIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell--sort'))
+    const filterIconWidth = getElementMarginAndWidth(queryElement(cell, '.vxe-cell--filter'))
+    mWidth += dragIconWidth + checkboxIconWidth + requiredIconWidth + editIconWidth + prefixIconWidth + suffixIconWidth + filterIconWidth + sortIconWidth
   }
   // 如果设置最小宽
   if (colMinWidth) {
-    const { refTableBody } = $table.getRefMaps()
-    const tableBody = refTableBody.value
-    const bodyElem = tableBody ? tableBody.$el as HTMLDivElement : null
-    if (bodyElem) {
+    const bodyScrollElem = getRefElem(elemStore['main-body-scroll'])
+    if (bodyScrollElem) {
       if (isScale(colMinWidth)) {
-        const bodyWidth = bodyElem.clientWidth - 1
+        const bodyWidth = bodyScrollElem.clientWidth - 1
         const meanWidth = bodyWidth / 100
         return Math.max(mWidth, Math.floor(XEUtils.toInteger(colMinWidth) * meanWidth))
       } else if (isPx(colMinWidth)) {
@@ -268,6 +801,15 @@ export function getColReMinWidth (params: {
 
 export function isColumnInfo (column: any): column is ColumnInfo {
   return column && (column.constructor === ColumnInfo || column instanceof ColumnInfo)
+}
+
+// 获取所有的列，排除分组
+export function getColumnList (columns: VxeTableDefines.ColumnInfo[]) {
+  const result: VxeTableDefines.ColumnInfo[] = []
+  columns.forEach((column) => {
+    result.push(...(column.children && column.children.length ? getColumnList(column.children) : [column]))
+  })
+  return result
 }
 
 export function createColumn ($xeTable: VxeTableConstructor & VxeTablePrivateMethods, options: VxeTableDefines.ColumnOptions | VxeTableDefines.ColumnInfo, renderOptions: any): any {
@@ -290,13 +832,14 @@ export function watchColumn ($xeTable: VxeTableConstructor & VxeTablePrivateMeth
   })
 }
 
-export function assemColumn ($xeTable: VxeTableConstructor & VxeTablePrivateMethods, elem: HTMLElement, column: ColumnInfo, colgroup: XEColumnInstance | null) {
+export function assembleColumn ($xeTable: VxeTableConstructor & VxeTablePrivateMethods, elem: HTMLElement, column: ColumnInfo, colgroup: XEColumnInstance | null) {
   const { reactData } = $xeTable
   const { staticColumns } = reactData
   const parentElem = elem.parentNode
-  const parentColumn = colgroup ? colgroup.column : null
+  const parentColumn = colgroup ? colgroup.columnConfig : null
   const parentCols = parentColumn ? parentColumn.children : staticColumns
   if (parentElem && parentCols) {
+    column.defaultParentId = parentColumn ? parentColumn.id : null
     parentCols.splice(XEUtils.arrayIndexOf(parentElem.children, elem), 0, column)
     reactData.staticColumns = staticColumns.slice(0)
   }
@@ -314,6 +857,7 @@ export function destroyColumn ($xeTable: VxeTableConstructor & VxeTablePrivateMe
 
 export function getRootColumn ($xeTable: VxeTableConstructor & VxeTablePrivateMethods, column: ColumnInfo) {
   const { internalData } = $xeTable
+
   const { fullColumnIdData } = internalData
   if (!column) {
     return null
@@ -329,45 +873,58 @@ export function getRootColumn ($xeTable: VxeTableConstructor & VxeTablePrivateMe
   return column
 }
 
-export function mergeBodyMethod (mergeList: VxeTableDefines.MergeItem[], _rowIndex: number, _columnIndex: number) {
-  for (let mIndex = 0; mIndex < mergeList.length; mIndex++) {
-    const { row: mergeRowIndex, col: mergeColIndex, rowspan: mergeRowspan, colspan: mergeColspan } = mergeList[mIndex]
-    if (mergeColIndex > -1 && mergeRowIndex > -1 && mergeRowspan && mergeColspan) {
-      if (mergeRowIndex === _rowIndex && mergeColIndex === _columnIndex) {
-        return { rowspan: mergeRowspan, colspan: mergeColspan }
-      }
-      if (_rowIndex >= mergeRowIndex && _rowIndex < mergeRowIndex + mergeRowspan && _columnIndex >= mergeColIndex && _columnIndex < mergeColIndex + mergeColspan) {
-        return { rowspan: 0, colspan: 0 }
-      }
-    }
+export function getFirstChildColumn (column: VxeTableDefines.ColumnInfo): VxeTableDefines.ColumnInfo {
+  const { children } = column
+  if (children && children.length) {
+    return getFirstChildColumn(XEUtils.first(children))
   }
+  return column
+}
+
+export function getLastChildColumn (column: VxeTableDefines.ColumnInfo): VxeTableDefines.ColumnInfo {
+  const { children } = column
+  if (children && children.length) {
+    return getFirstChildColumn(XEUtils.last(children))
+  }
+  return column
 }
 
 export function clearTableDefaultStatus ($xeTable: VxeTableConstructor & VxeTablePrivateMethods) {
   const { props, internalData } = $xeTable
+
   internalData.initStatus = false
-  $xeTable.clearSort()
-  $xeTable.clearCurrentRow()
-  $xeTable.clearCurrentColumn()
-  $xeTable.clearRadioRow()
-  $xeTable.clearRadioReserve()
-  $xeTable.clearCheckboxRow()
-  $xeTable.clearCheckboxReserve()
-  $xeTable.clearRowExpand()
-  $xeTable.clearTreeExpand()
-  $xeTable.clearTreeExpandReserve()
-  $xeTable.clearPendingRow()
+  const actionList = [
+    $xeTable.clearSort(),
+    $xeTable.clearCurrentRow(),
+    $xeTable.clearCurrentColumn(),
+    $xeTable.clearRadioRow(),
+    $xeTable.clearRadioReserve(),
+    $xeTable.clearCheckboxRow(),
+    $xeTable.clearCheckboxReserve(),
+    $xeTable.clearRowExpand(),
+    $xeTable.clearTreeExpand(),
+    $xeTable.clearTreeExpandReserve(),
+    $xeTable.clearPendingRow()
+  ]
   if ($xeTable.clearFilter) {
-    $xeTable.clearFilter()
+    actionList.push(
+      $xeTable.clearFilter()
+    )
   }
   if ($xeTable.clearSelected && (props.keyboardConfig || props.mouseConfig)) {
-    $xeTable.clearSelected()
+    actionList.push(
+      $xeTable.clearSelected()
+    )
   }
   if ($xeTable.clearCellAreas && props.mouseConfig) {
-    $xeTable.clearCellAreas()
-    $xeTable.clearCopyCellArea()
+    actionList.push(
+      $xeTable.clearCellAreas(),
+      $xeTable.clearCopyCellArea()
+    )
   }
-  return $xeTable.clearScroll()
+  return Promise.all(actionList).then(() => {
+    return $xeTable.clearScroll()
+  })
 }
 
 export function clearTableAllStatus ($xeTable: VxeTableConstructor & VxeTablePrivateMethods) {
@@ -378,72 +935,103 @@ export function clearTableAllStatus ($xeTable: VxeTableConstructor & VxeTablePri
 }
 
 export function rowToVisible ($xeTable: VxeTableConstructor & VxeTablePrivateMethods, row: any) {
-  const { reactData, internalData } = $xeTable
-  const { refTableBody } = $xeTable.getRefMaps()
-  const { scrollYLoad } = reactData
-  const { afterFullData, scrollYStore } = internalData
-  const tableBody = refTableBody.value
-  const bodyElem = tableBody ? tableBody.$el as HTMLDivElement : null
-  if (bodyElem) {
-    const trElem: HTMLTableRowElement | null = bodyElem.querySelector(`[rowid="${getRowid($xeTable, row)}"]`)
+  const tableProps = $xeTable.props
+  const reactData = $xeTable.reactData
+  const internalData = $xeTable.internalData
+
+  const { computeLeftFixedWidth, computeRightFixedWidth, computeRowOpts, computeCellOpts, computeDefaultRowHeight } = $xeTable.getComputeMaps()
+  const { showOverflow } = tableProps
+  const { scrollYLoad, scrollYTop } = reactData
+  const { elemStore, afterFullData, fullAllDataRowIdData, isResizeCellHeight } = internalData
+  const rowOpts = computeRowOpts.value
+  const cellOpts = computeCellOpts.value
+  const defaultRowHeight = computeDefaultRowHeight.value
+  const leftFixedWidth = computeLeftFixedWidth.value
+  const rightFixedWidth = computeRightFixedWidth.value
+  const bodyScrollElem = getRefElem(elemStore['main-body-scroll'])
+  const rowid = getRowid($xeTable, row)
+  if (bodyScrollElem) {
+    const bodyHeight = bodyScrollElem.clientHeight
+    const bodyScrollTop = bodyScrollElem.scrollTop
+    const trElem: HTMLTableRowElement | null = bodyScrollElem.querySelector(`[rowid="${rowid}"]`)
     if (trElem) {
-      const bodyHeight = bodyElem.clientHeight
-      const bodySrcollTop = bodyElem.scrollTop
-      const trOffsetParent = trElem.offsetParent as HTMLElement
-      const trOffsetTop = trElem.offsetTop + (trOffsetParent ? trOffsetParent.offsetTop : 0)
+      const trOffsetTop = trElem.offsetTop + (scrollYLoad ? scrollYTop : 0)
       const trHeight = trElem.clientHeight
       // 检测行是否在可视区中
-      if (trOffsetTop < bodySrcollTop || trOffsetTop > bodySrcollTop + bodyHeight) {
-        // 向上定位
+      if (trOffsetTop < bodyScrollTop || trOffsetTop > bodyScrollTop + bodyHeight) {
         return $xeTable.scrollTo(null, trOffsetTop)
-      } else if (trOffsetTop + trHeight >= bodyHeight + bodySrcollTop) {
-        // 向下定位
-        return $xeTable.scrollTo(null, bodySrcollTop + trHeight)
+      } else if (trOffsetTop + trHeight >= bodyHeight + bodyScrollTop) {
+        return $xeTable.scrollTo(null, bodyScrollTop + trHeight)
       }
     } else {
-      // 如果是虚拟渲染跨行滚动
+      // 如果是虚拟渲染滚动
       if (scrollYLoad) {
-        return $xeTable.scrollTo(null, (afterFullData.indexOf(row) - 1) * scrollYStore.rowHeight)
+        const isCustomCellHeight = isResizeCellHeight || cellOpts.height || rowOpts.height
+        if (!isCustomCellHeight && showOverflow) {
+          return $xeTable.scrollTo(null, ($xeTable.findRowIndexOf(afterFullData, row) - 1) * defaultRowHeight)
+        }
+        const rowRest = fullAllDataRowIdData[rowid] || {}
+        const rHeight = rowRest.resizeHeight || cellOpts.height || rowOpts.height || rowRest.height || defaultRowHeight
+        const scrollTop = rowRest.oTop
+        if (scrollTop < bodyScrollTop) {
+          return $xeTable.scrollTo(null, scrollTop - leftFixedWidth - 1)
+        }
+        return $xeTable.scrollTo(null, (scrollTop + rHeight) - (bodyHeight - rightFixedWidth - 1))
       }
     }
   }
   return Promise.resolve()
 }
 
-export function colToVisible ($xeTable: VxeTableConstructor & VxeTablePrivateMethods, column: VxeTableDefines.ColumnInfo) {
-  const { reactData, internalData } = $xeTable
-  const { refTableBody } = $xeTable.getRefMaps()
-  const { scrollXLoad } = reactData
-  const { visibleColumn } = internalData
-  const tableBody = refTableBody.value
-  const bodyElem = tableBody ? tableBody.$el as HTMLDivElement : null
-  if (bodyElem) {
-    const tdElem: HTMLTableCellElement | null = bodyElem.querySelector(`.${column.id}`)
+export function colToVisible ($xeTable: VxeTableConstructor & VxeTablePrivateMethods, column: VxeTableDefines.ColumnInfo, row?: any) {
+  const reactData = $xeTable.reactData
+  const internalData = $xeTable.internalData
+
+  const { computeLeftFixedWidth, computeRightFixedWidth } = $xeTable.getComputeMaps()
+  const { scrollXLoad, scrollXLeft } = reactData
+  const { elemStore, visibleColumn } = internalData
+  const leftFixedWidth = computeLeftFixedWidth.value
+  const rightFixedWidth = computeRightFixedWidth.value
+  const bodyScrollElem = getRefElem(elemStore['main-body-scroll'])
+  if (column.fixed) {
+    return Promise.resolve()
+  }
+  if (bodyScrollElem) {
+    const bodyWidth = bodyScrollElem.clientWidth
+    const bodyScrollLeft = bodyScrollElem.scrollLeft
+    let tdElem: HTMLTableCellElement | null = null
+    if (row) {
+      const rowid = getRowid($xeTable, row)
+      tdElem = bodyScrollElem.querySelector(`[rowid="${rowid}"] .${column.id}`)
+    }
+    if (!tdElem) {
+      tdElem = bodyScrollElem.querySelector(`.${column.id}`)
+    }
     if (tdElem) {
-      const bodyWidth = bodyElem.clientWidth
-      const bodySrcollLeft = bodyElem.scrollLeft
-      const tdOffsetParent = tdElem.offsetParent as HTMLElement
-      const tdOffsetLeft = tdElem.offsetLeft + (tdOffsetParent ? tdOffsetParent.offsetLeft : 0)
-      const tdWidth = tdElem.clientWidth
-      // 检测行是否在可视区中
-      if (tdOffsetLeft < bodySrcollLeft || tdOffsetLeft > bodySrcollLeft + bodyWidth) {
-        // 向左定位
-        return $xeTable.scrollTo(tdOffsetLeft)
-      } else if (tdOffsetLeft + tdWidth >= bodyWidth + bodySrcollLeft) {
-        // 向右定位
-        return $xeTable.scrollTo(bodySrcollLeft + tdWidth)
+      const tdOffsetLeft = tdElem.offsetLeft + (scrollXLoad ? scrollXLeft : 0)
+      const cellWidth = tdElem.clientWidth
+      // 检测是否在可视区中
+      if (tdOffsetLeft < (bodyScrollLeft + leftFixedWidth)) {
+        return $xeTable.scrollTo(tdOffsetLeft - leftFixedWidth - 1)
+      } else if ((tdOffsetLeft + cellWidth - bodyScrollLeft) > (bodyWidth - rightFixedWidth)) {
+        return $xeTable.scrollTo((tdOffsetLeft + cellWidth) - (bodyWidth - rightFixedWidth - 1))
       }
     } else {
-      // 如果是虚拟渲染跨行滚动
+      // 检测是否在虚拟渲染可视区中
       if (scrollXLoad) {
         let scrollLeft = 0
-        for (let index = 0; index < visibleColumn.length; index++) {
-          if (visibleColumn[index] === column) {
+        const cellWidth = column.renderWidth
+        for (let i = 0; i < visibleColumn.length; i++) {
+          const currCol = visibleColumn[i]
+          if (currCol === column || currCol.id === column.id) {
             break
           }
-          scrollLeft += visibleColumn[index].renderWidth
+          scrollLeft += currCol.renderWidth
         }
-        return $xeTable.scrollTo(scrollLeft)
+        if (scrollLeft < bodyScrollLeft) {
+          return $xeTable.scrollTo(scrollLeft - leftFixedWidth - 1)
+        }
+        return $xeTable.scrollTo((scrollLeft + cellWidth) - (bodyWidth - rightFixedWidth - 1))
       }
     }
   }

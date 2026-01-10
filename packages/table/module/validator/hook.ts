@@ -1,7 +1,7 @@
 import { nextTick } from 'vue'
 import XEUtils from 'xe-utils'
 import { VxeUI } from '../../../ui'
-import { getFuncText, eqEmptyValue } from '../../../ui/src/utils'
+import { eqEmptyValue, getFuncText } from '../../../ui/src/utils'
 import { scrollToView } from '../../../ui/src/dom'
 import { handleFieldOrColumn, getRowid } from '../../src/util'
 import { warnLog, errLog } from '../../../ui/src/log'
@@ -43,18 +43,116 @@ class Rule {
   [key: string]: any
 }
 
-const tableValidatorMethodKeys: (keyof TableValidatorMethods)[] = ['fullValidate', 'validate', 'clearValidate']
+// 如果存在 pattern，判断正则
+function validREValue (pattern: string | RegExp | undefined, val: string) {
+  if (pattern && !(XEUtils.isRegExp(pattern) ? pattern : new RegExp(pattern)).test(val)) {
+    return false
+  }
+  return true
+}
+
+// 如果存在 max，判断最大值
+function validMaxValue (max: string | number | undefined, num: number) {
+  if (!XEUtils.eqNull(max) && num > XEUtils.toNumber(max)) {
+    return false
+  }
+  return true
+}
+
+// 如果存在 min，判断最小值
+function validMinValue (min: string | number | undefined, num: number) {
+  if (!XEUtils.eqNull(min) && num < XEUtils.toNumber(min)) {
+    return false
+  }
+  return true
+}
+
+function validRuleValue (rule: VxeTableDefines.ValidatorRule, val: any, required: boolean | undefined) {
+  const { type, min, max, pattern } = rule
+  const isArrType = type === 'array'
+  const isNumType = type === 'number'
+  const isStrType = type === 'string'
+  const strVal = `${val}`
+  if (!validREValue(pattern, strVal)) {
+    return false
+  }
+  if (isArrType) {
+    if (!XEUtils.isArray(val)) {
+      return false
+    }
+    if (required) {
+      if (!val.length) {
+        return false
+      }
+    }
+    if (!validMinValue(min, val.length)) {
+      return false
+    }
+    if (!validMaxValue(max, val.length)) {
+      return false
+    }
+  } else if (isNumType) {
+    const numVal = Number(val)
+    if (isNaN(numVal)) {
+      return false
+    }
+    if (!validMinValue(min, numVal)) {
+      return false
+    }
+    if (!validMaxValue(max, numVal)) {
+      return false
+    }
+  } else {
+    if (isStrType) {
+      if (!XEUtils.isString(val)) {
+        return false
+      }
+    }
+    if (required) {
+      if (!strVal) {
+        return false
+      }
+    }
+    if (!validMinValue(min, strVal.length)) {
+      return false
+    }
+    if (!validMaxValue(max, strVal.length)) {
+      return false
+    }
+  }
+  return true
+}
+
+function checkRuleStatus (rule: VxeTableDefines.ValidatorRule, val: any) {
+  const { required } = rule
+  const isEmptyVal = XEUtils.isArray(val) ? !val.length : eqEmptyValue(val)
+  if (required) {
+    if (isEmptyVal) {
+      return false
+    }
+    if (!validRuleValue(rule, val, required)) {
+      return false
+    }
+  } else {
+    if (!isEmptyVal) {
+      if (!validRuleValue(rule, val, required)) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+const tableValidatorMethodKeys: (keyof TableValidatorMethods)[] = ['fullValidate', 'validate', 'fullValidateField', 'validateField', 'clearValidate']
 
 hooks.add('tableValidatorModule', {
   setupTable ($xeTable) {
     const { props, reactData, internalData } = $xeTable
     const { refValidTooltip } = $xeTable.getRefMaps()
-    const { computeValidOpts, computeTreeOpts, computeEditOpts } = $xeTable.getComputeMaps()
+    const { computeValidOpts, computeTreeOpts, computeEditOpts, computeAggregateOpts } = $xeTable.getComputeMaps()
 
     let validatorMethods = {} as TableValidatorMethods
     let validatorPrivateMethods = {} as TableValidatorPrivateMethods
-
-    let validRuleErr: boolean
 
     /**
      * 聚焦到校验通过的单元格并弹出校验错误提示
@@ -66,8 +164,8 @@ hooks.add('tableValidatorModule', {
           $xeTable.dispatchEvent('valid-error', params, null)
           resolve()
         } else {
-          $xeTable.handleActived(params, { type: 'valid-error', trigger: 'call' }).then(() => {
-            resolve(validatorPrivateMethods.showValidTooltip(params))
+          $xeTable.handleEdit(params, { type: 'valid-error', trigger: 'call' }).then(() => {
+            resolve($xeTable.showValidTooltip(params))
           })
         }
       })
@@ -87,7 +185,7 @@ hooks.add('tableValidatorModule', {
           column: any;
           rule: any;
           content: any;
-        }> = validErrMaps
+        }> = {}
         if (keys.length) {
           const firstKey = keys[0]
           resMaps[firstKey] = validErrMaps[firstKey]
@@ -106,12 +204,13 @@ hooks.add('tableValidatorModule', {
      * 如果只传 callback 否则默认验证整个表格数据
      * 返回 Promise 对象，或者使用回调方式
      */
-    const beginValidate = (rows: any, cb: any, isFull?: boolean): Promise<any> => {
+    const beginValidate = (rows: any, cols: VxeTableDefines.ColumnInfo[] | null, cb: any, isFull?: boolean): Promise<any> => {
       const validRest: any = {}
       const { editRules, treeConfig } = props
-      const { afterFullData, visibleColumn } = internalData
+      const { isRowGroupStatus } = reactData
+      const { afterFullData, pendingRowMaps, removeRowMaps } = internalData
       const treeOpts = computeTreeOpts.value
-      const childrenField = treeOpts.children || treeOpts.childrenField
+      const aggregateOpts = computeAggregateOpts.value
       const validOpts = computeValidOpts.value
       let validList
       if (rows === true) {
@@ -132,8 +231,8 @@ hooks.add('tableValidatorModule', {
       }
       const rowValidErrs: any = []
       internalData._lastCallTime = Date.now()
-      validRuleErr = false // 如果为快速校验，当存在某列校验不通过时将终止执行
-      validatorMethods.clearValidate()
+      internalData.validRuleErr = false // 如果为快速校验，当存在某列校验不通过时将终止执行
+      $xeTable.clearValidate()
       const validErrMaps: Record<string, {
         row: any;
         column: any;
@@ -141,15 +240,28 @@ hooks.add('tableValidatorModule', {
         content: any;
       }> = {}
       if (editRules) {
-        const columns = $xeTable.getColumns()
+        const columns = cols && cols.length ? cols : $xeTable.getColumns()
         const handleVaild = (row: any) => {
-          if (isFull || !validRuleErr) {
+          const rowid = getRowid($xeTable, row)
+          // 是否删除
+          if (removeRowMaps[rowid]) {
+            return
+          }
+          // 是否标记删除
+          if (pendingRowMaps[rowid]) {
+            return
+          }
+          if ($xeTable.isAggregateRecord(row)) {
+            return
+          }
+          if (isFull || !internalData.validRuleErr) {
             const colVailds: any[] = []
-            columns.forEach((column: any) => {
-              if ((isFull || !validRuleErr) && XEUtils.has(editRules, column.property)) {
+            columns.forEach((column) => {
+              const field = XEUtils.isString(column) ? column : column.field
+              if ((isFull || !internalData.validRuleErr) && XEUtils.has(editRules, field)) {
                 colVailds.push(
                   validatorPrivateMethods.validCellRules('all', row, column)
-                    .catch(({ rule, rules }: any) => {
+                    .catch(({ rule, rules }) => {
                       const rest = {
                         rule,
                         rules,
@@ -157,11 +269,11 @@ hooks.add('tableValidatorModule', {
                         row,
                         columnIndex: $xeTable.getColumnIndex(column),
                         column,
-                        field: column.property,
+                        field,
                         $table: $xeTable
                       }
-                      if (!validRest[column.property]) {
-                        validRest[column.property] = []
+                      if (!validRest[field]) {
+                        validRest[field] = []
                       }
                       validErrMaps[`${getRowid($xeTable, row)}:${column.id}`] = {
                         column,
@@ -169,9 +281,9 @@ hooks.add('tableValidatorModule', {
                         rule,
                         content: rule.content
                       }
-                      validRest[column.property].push(rest)
+                      validRest[field].push(rest)
                       if (!isFull) {
-                        validRuleErr = true
+                        internalData.validRuleErr = true
                         return Promise.reject(rest)
                       }
                     })
@@ -181,7 +293,10 @@ hooks.add('tableValidatorModule', {
             rowValidErrs.push(Promise.all(colVailds))
           }
         }
-        if (treeConfig) {
+        if (isRowGroupStatus) {
+          XEUtils.eachTree(validList, handleVaild, { children: aggregateOpts.mapChildrenField })
+        } else if (treeConfig) {
+          const childrenField = treeOpts.children || treeOpts.childrenField
           XEUtils.eachTree(validList, handleVaild, { children: childrenField })
         } else {
           validList.forEach(handleVaild)
@@ -215,7 +330,7 @@ hooks.add('tableValidatorModule', {
               })
             }
             const posAndFinish = () => {
-              firstErrParams.cell = $xeTable.getCell(firstErrParams.row, firstErrParams.column)
+              firstErrParams.cell = $xeTable.getCellElement(firstErrParams.row, firstErrParams.column)
               scrollToView(firstErrParams.cell)
               handleValidError(firstErrParams).then(finish)
             }
@@ -229,11 +344,7 @@ hooks.add('tableValidatorModule', {
             } else {
               const row = firstErrParams.row
               const column = firstErrParams.column
-              const rowIndex = afterFullData.indexOf(row)
-              const columnIndex = visibleColumn.indexOf(column)
-              const targetRow = rowIndex > 0 ? afterFullData[rowIndex - 1] : row
-              const targetColumn = columnIndex > 0 ? visibleColumn[columnIndex - 1] : column
-              $xeTable.scrollToRow(targetRow, targetColumn).then(posAndFinish)
+              $xeTable.scrollToRow(row, column).then(posAndFinish)
             }
           })
         })
@@ -249,33 +360,46 @@ hooks.add('tableValidatorModule', {
 
     validatorMethods = {
       /**
-       * 完整校验，和 validate 的区别就是会给有效数据中的每一行进行校验
+       * 完整校验行，和 validate 的区别就是会给有效数据中的每一行进行校验
        */
       fullValidate (rows, cb) {
-        if (process.env.VUE_APP_VXE_ENV === 'development') {
-          if (XEUtils.isFunction(cb)) {
-            warnLog('vxe.error.notValidators', ['fullValidate(rows, callback)', 'fullValidate(rows)'])
-          }
+        if (XEUtils.isFunction(cb)) {
+          warnLog('vxe.error.notValidators', ['fullValidate(rows, callback)', 'fullValidate(rows)'])
         }
-        return beginValidate(rows, cb, true)
+        return beginValidate(rows, null, cb, true)
       },
       /**
-       * 快速校验，如果存在记录不通过的记录，则返回不再继续校验（异步校验除外）
+       * 快速校验行，如果存在记录不通过的记录，则返回不再继续校验（异步校验除外）
        */
       validate (rows, cb) {
-        if (process.env.VUE_APP_VXE_ENV === 'development') {
-          if (XEUtils.isFunction(cb)) {
-            warnLog('vxe.error.notValidators', ['validate(rows, callback)', 'validate(rows)'])
-          }
+        return beginValidate(rows, null, cb)
+      },
+      /**
+       * 完整校验单元格，和 validateField 的区别就是会给有效数据中的每一行进行校验
+       */
+      fullValidateField (rows, fieldOrColumn) {
+        const colList = (XEUtils.isArray(fieldOrColumn) ? fieldOrColumn : (fieldOrColumn ? [fieldOrColumn] : [])).map(column => handleFieldOrColumn($xeTable, column)) as VxeTableDefines.ColumnInfo<any>[]
+        if (colList.length) {
+          return beginValidate(rows, colList, null, true)
         }
-        return beginValidate(rows, cb)
+        return nextTick()
+      },
+      /**
+       * 快速校验单元格，如果存在记录不通过的记录，则返回不再继续校验（异步校验除外）
+       */
+      validateField (rows, fieldOrColumn) {
+        const colList = (XEUtils.isArray(fieldOrColumn) ? fieldOrColumn : (fieldOrColumn ? [fieldOrColumn] : [])).map(column => handleFieldOrColumn($xeTable, column)) as VxeTableDefines.ColumnInfo<any>[]
+        if (colList.length) {
+          return beginValidate(rows, colList, null)
+        }
+        return nextTick()
       },
       clearValidate (rows, fieldOrColumn) {
         const { validErrorMaps } = reactData
         const validTip = refValidTooltip.value
         const validOpts = computeValidOpts.value
         const rowList = XEUtils.isArray(rows) ? rows : (rows ? [rows] : [])
-        const colList = (XEUtils.isArray(fieldOrColumn) ? fieldOrColumn : (fieldOrColumn ? [fieldOrColumn] : []).map(column => handleFieldOrColumn($xeTable, column))) as VxeTableDefines.ColumnInfo<any>[]
+        const colList = (XEUtils.isArray(fieldOrColumn) ? fieldOrColumn : (fieldOrColumn ? [fieldOrColumn] : [])).map(column => handleFieldOrColumn($xeTable, column)) as VxeTableDefines.ColumnInfo<any>[]
         let validErrMaps: Record<string, {
           row: any;
           column: any;
@@ -320,29 +444,6 @@ hooks.add('tableValidatorModule', {
       }
     }
 
-    const validErrorRuleValue = (rule: VxeTableDefines.ValidatorRule, val: any) => {
-      const { type, min, max, pattern } = rule
-      const isNumType = type === 'number'
-      const numVal = isNumType ? XEUtils.toNumber(val) : XEUtils.getSize(val)
-      // 判断数值
-      if (isNumType && isNaN(val)) {
-        return true
-      }
-      // 如果存在 min，判断最小值
-      if (!XEUtils.eqNull(min) && numVal < XEUtils.toNumber(min)) {
-        return true
-      }
-      // 如果存在 max，判断最大值
-      if (!XEUtils.eqNull(max) && numVal > XEUtils.toNumber(max)) {
-        return true
-      }
-      // 如果存在 pattern，正则校验
-      if (pattern && !(XEUtils.isRegExp(pattern) ? pattern : new RegExp(pattern)).test(val)) {
-        return true
-      }
-      return false
-    }
-
     validatorPrivateMethods = {
       /**
        * 校验数据
@@ -359,6 +460,9 @@ hooks.add('tableValidatorModule', {
        *  trigger=blur|change 触发方式（除非特殊场景，否则默认为空就行）
        */
       validCellRules (validType, row, column, val) {
+        const $xeGrid = $xeTable.xeGrid
+        const $xeGantt = $xeTable.xeGantt
+
         const { editRules } = props
         const { field } = column
         const errorRules: Rule[] = []
@@ -368,7 +472,7 @@ hooks.add('tableValidatorModule', {
           if (rules) {
             const cellValue = XEUtils.isUndefined(val) ? XEUtils.get(row, field) : val
             rules.forEach((rule) => {
-              const { type, trigger, required, validator } = rule
+              const { trigger, validator } = rule
               if (validType === 'all' || !trigger || validType === trigger) {
                 if (validator) {
                   const validParams = {
@@ -381,54 +485,42 @@ hooks.add('tableValidatorModule', {
                     columnIndex: $xeTable.getColumnIndex(column),
                     field: column.field,
                     $table: $xeTable,
-                    $grid: $xeTable.xegrid
+                    $grid: $xeGrid,
+                    $gantt: $xeGantt
                   }
                   let customValid: any
                   if (XEUtils.isString(validator)) {
                     const gvItem = validators.get(validator)
                     if (gvItem) {
-                      if (gvItem.cellValidatorMethod) {
-                        customValid = gvItem.cellValidatorMethod(validParams)
+                      const tcvMethod = gvItem.tableCellValidatorMethod || gvItem.cellValidatorMethod
+                      if (tcvMethod) {
+                        customValid = tcvMethod(validParams)
                       } else {
-                        if (process.env.VUE_APP_VXE_ENV === 'development') {
-                          warnLog('vxe.error.notValidators', [validator])
-                        }
-                      }
-                    } else {
-                      if (process.env.VUE_APP_VXE_ENV === 'development') {
                         errLog('vxe.error.notValidators', [validator])
                       }
+                    } else {
+                      errLog('vxe.error.notValidators', [validator])
                     }
                   } else {
                     customValid = validator(validParams)
                   }
                   if (customValid) {
                     if (XEUtils.isError(customValid)) {
-                      validRuleErr = true
+                      internalData.validRuleErr = true
                       errorRules.push(new Rule({ type: 'custom', trigger, content: customValid.message, rule: new Rule(rule) }))
                     } else if (customValid.catch) {
                       // 如果为异步校验（注：异步校验是并发无序的）
                       syncValidList.push(
                         customValid.catch((e: any) => {
-                          validRuleErr = true
+                          internalData.validRuleErr = true
                           errorRules.push(new Rule({ type: 'custom', trigger, content: e && e.message ? e.message : (rule.content || rule.message), rule: new Rule(rule) }))
                         })
                       )
                     }
                   }
                 } else {
-                  const isArrType = type === 'array'
-                  const isArrVal = XEUtils.isArray(cellValue)
-                  let hasEmpty = true
-                  if (isArrType || isArrVal) {
-                    hasEmpty = !isArrVal || !cellValue.length
-                  } else if (XEUtils.isString(cellValue)) {
-                    hasEmpty = eqEmptyValue(cellValue.trim())
-                  } else {
-                    hasEmpty = eqEmptyValue(cellValue)
-                  }
-                  if (required ? (hasEmpty || validErrorRuleValue(rule, cellValue)) : (!hasEmpty && validErrorRuleValue(rule, cellValue))) {
-                    validRuleErr = true
+                  if (!checkRuleStatus(rule, cellValue)) {
+                    internalData.validRuleErr = true
                     errorRules.push(new Rule(rule))
                   }
                 }
@@ -469,8 +561,8 @@ hooks.add('tableValidatorModule', {
         // 校验单元格
         if (editConfig && editRules && actived.row) {
           const { row, column, cell } = actived.args
-          if (validatorPrivateMethods.hasCellRules(type, row, column)) {
-            return validatorPrivateMethods.validCellRules(type, row, column).then(() => {
+          if ($xeTable.hasCellRules(type, row, column)) {
+            return $xeTable.validCellRules(type, row, column).then(() => {
               if (editOpts.mode === 'row') {
                 validatorMethods.clearValidate(row, column)
               }
@@ -478,7 +570,7 @@ hooks.add('tableValidatorModule', {
               // 如果校验不通过与触发方式一致，则聚焦提示错误，否则跳过并不作任何处理
               if (!rule.trigger || type === rule.trigger) {
                 const rest = { rule, row, column, cell }
-                validatorPrivateMethods.showValidTooltip(rest)
+                $xeTable.showValidTooltip(rest)
                 return Promise.reject(rest)
               }
               return Promise.resolve()
@@ -531,5 +623,8 @@ hooks.add('tableValidatorModule', {
   },
   setupGrid ($xeGrid) {
     return $xeGrid.extendTableMethods(tableValidatorMethodKeys)
+  },
+  setupGantt ($xeGantt) {
+    return $xeGantt.extendTableMethods(tableValidatorMethodKeys)
   }
 })

@@ -1,10 +1,12 @@
 # vxe-table
 
-[简体中文](README.md) | [繁體中文](README.zh-TW.md) | English  
+[简体中文](README.md) | [繁體中文](README.zh-TW.md) | English | [日本語](README.ja-JP.md)  
 
-[![star](https://gitee.com/xuliangzhan_admin/vxe-table/badge/star.svg?theme=gvp)](https://gitee.com/xuliangzhan_admin/vxe-table/stargazers)
+[![github star](https://img.shields.io/github/stars/x-extends/vxe-table.svg)](https://github.com/x-extends/vxe-table/stargazers)
+[![gitee star](https://gitee.com/x-extends/vxe-table/badge/star.svg?theme=gvp)](https://gitee.com/x-extends/vxe-table/stargazers)
+[![gitcode star](https://gitcode.com/x-extends/vxe-table/star/badge.svg)](https://gitcode.com/x-extends/vxe-table/stargazers)
 [![npm version](https://img.shields.io/npm/v/vxe-table.svg?style=flat-square)](https://www.npmjs.com/package/vxe-table)
-[![npm build](https://travis-ci.com/x-extends/vxe-table.svg?branch=master)](https://travis-ci.com/x-extends/vxe-table)
+[![NodeJS with Webpack](https://github.com/x-extends/vxe-table/actions/workflows/webpack.yml/badge.svg)](https://github.com/x-extends/vxe-table/actions/workflows/webpack.yml)
 [![npm downloads](https://img.shields.io/npm/dt/vxe-table.svg?style=flat-square)](https://npm-stat.com/charts.html?package=vxe-table)
 [![issues](https://img.shields.io/github/issues/x-extends/vxe-table.svg)](https://github.com/x-extends/vxe-table/issues)
 [![issues closed](https://img.shields.io/github/issues-closed/x-extends/vxe-table.svg)](https://github.com/x-extends/vxe-table/issues?q=is%3Aissue+is%3Aclosed)
@@ -12,20 +14,7 @@
 [![pull requests closed](https://img.shields.io/github/issues-pr-closed/x-extends/vxe-table.svg)](https://github.com/x-extends/vxe-table/pulls?q=is%3Apr+is%3Aclosed)
 [![npm license](https://img.shields.io/github/license/mashape/apistatus.svg)](LICENSE)
 
-A [vue](https://www.npmjs.com/package/vue) based PC form component, support add delete change check, virtual tree, column drag and drop, lazy loading, shortcut menu, data verification, import/export/print, form rendering, custom template, renderer, JSON configuration...
-
-* Design concept
-  * Efficient and concise API design for modern browsers.
-  * Modular tables, on-demand loading.
-  * Designed for single row table editing, supports addition, deletion, modification and query as well as more expansion, with powerful functions and performance at the same time.
-
-* Plan
-  * [x] ~~v1.0 Based on vue2.6, Support for all major browsers.~~
-  * [x] ~~v2.0 Based on vue2.6, Support for all major browsers.~~
-  * [x] v3.0 Based on vue2.6+, supports modern browsers and retains compatibility with IE11.
-  * [ ] v3.9 Based on vue2.6+, Reconstruct and split the components into [Vxe table](https://github.com/x-extends/vxe-table) and [Vxe UI](https://github.com/x-extends/vxe-pc-ui). Form Designer, list designer, process designer will be supported.
-  * [x] v4.0 Based on vue3.2+, Only support modern browser, not IE.
-  * [x] v4.7 Based on vue3.2+, Reconstruct and split the components into [Vxe table](https://github.com/x-extends/vxe-table) and [Vxe UI](https://github.com/x-extends/vxe-pc-ui). Form Designer, list designer, process designer will be supported.
+A PC-end table component based on [Vxe UI](https://github.com/x-extends/vxe-pc-ui), enterprise-level table solution with support for copy-paste, data pivot tables, and virtual lists, featuring high performance.
 
 ## Browser Support
 
@@ -33,67 +22,23 @@ A [vue](https://www.npmjs.com/package/vue) based PC form component, support add 
 --- | --- | --- | --- | --- |
 Latest ✔ | Latest ✔ | Latest ✔ | Latest ✔ | Latest ✔ |
 
-## Features
-
-* [x] Basic table
-* [x] Configuration grid
-* [x] Striped
-* [x] Table with border
-* [x] Cell style
-* [x] Column resizing
-* [x] Minimum/maximum height
-* [x] Resize height & width
-* [x] Fixed column
-* [x] Grouping table header
-* [x] Table footer
-* [x] Highlight row & column
-* [x] Table sequence
-* [x] Radio
-* [x] Checkbox
-* [x] Sorting
-* [x] Multi field sorting
-* [x] Filter
-* [x] Merged cells
-* [x] Merged footer items
-* [x] Import/Export/Print
-* [x] Show/Hide column
-* [x] Drag and drop/Customize column sorting
-* [x] Loading
-* [x] Formatted cell
-* [x] Slot - template
-* [x] Context menu
-* [x] Detail - Expandable row
-* [x] Toolbar
-* [x] Virtual tree
-* [x] Editable CRUD
-* [x] Validate
-* [x] Data Proxy
-* [x] Keyboard navigation
-* [x] VxeGlobalRenderer
-* [x] Virtual scroll
-* [x] Virtual merger
-* [x] CSS Variable Theme
-* [x] ([Enterprise](https://vxetable.cn/pluginDocs/)) Cell area selection
-* [x] ([Enterprise](https://vxetable.cn/pluginDocs/)) Cell copy & paste
-* [x] ([Enterprise](https://vxetable.cn/pluginDocs/)) Cell find and replace
-* [x] ([Enterprise](https://vxetable.cn/pluginDocs/)) Full keyboard operation
-
 ## Installing
 
 Version: [vue](https://www.npmjs.com/package/vue) 3.x
 
 ```shell
-npm install vxe-table
+npm install vxe-table@next
 ```
 
 Get on [unpkg](https://unpkg.com/vxe-table/) and [cdnjs](https://cdn.jsdelivr.net/npm/vxe-table/)
 
-### npm
+### NPM
 
 ```javascript
-import { createApp } from 'vue'
+// ...
 import VxeUITable from 'vxe-table'
 import 'vxe-table/lib/style.css'
+// ...
 
 createApp(App).use(VxeUITable).mount('#app')
 ```
@@ -104,11 +49,15 @@ Use a third-party CDN to remember to lock the version number to avoid being affe
 ***It is not recommended to use the CDN address of a third party in a formal environment because the connection can fail at any time***  
 
 ```HTML
-<!-- Style -->
-<link rel="stylesheet" href="https://unpkg.com/vxe-table/lib/style.css">
-<!-- Script -->
-<script src="https://unpkg.com/xe-utils"></script>
-<script src="https://unpkg.com/vxe-table"></script>
+<!-- style -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vxe-pc-ui/lib/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vxe-table@next/lib/style.css">
+<!-- vue -->
+<script src="https://cdn.jsdelivr.net/npm/vue"></script>
+<!-- table -->
+<script src="https://cdn.jsdelivr.net/npm/xe-utils"></script>
+<script src="https://cdn.jsdelivr.net/npm/vxe-pc-ui"></script>
+<script src="https://cdn.jsdelivr.net/npm/vxe-table@next"></script>
 ```
 
 ## Example
@@ -141,14 +90,15 @@ const tableData = ref([
 
 ## Online Documents
 
-👉 [Document](https://vxetable.cn)  
+👉 [UI Document](https://vxeui.com)  
+👉 [Table Document](https://vxetable.cn)  
 
 ## Run the project
 
 Install dependencies
 
 ```shell
-npm install
+npm run update
 ```
 
 Start local debugging
@@ -162,12 +112,6 @@ Compile packaging, generated compiled directory: es,lib
 ```shell
 npm run lib
 ```
-
-## Contributors
-
-Thank you to everyone who contributed to this project.
-
-[![vxe-table](https://contrib.rocks/image?repo=x-extends/vxe-table)](https://github.com/x-extends/vxe-table/graphs/contributors)
 
 ## License
 

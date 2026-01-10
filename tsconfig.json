@@ -7,7 +7,7 @@
     "jsxImportSource": "vue",
     "importHelpers": true,
     "moduleResolution": "node",
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
@@ -32,13 +32,11 @@
     ]
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
     "examples/**/*.ts",
     "examples/**/*.tsx",
     "examples/**/*.vue",
-    "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
   ],
   "exclude": [
     "node_modules"

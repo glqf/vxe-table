@@ -1,6 +1,10 @@
 import { VxeTableEmits } from '../../../types'
 
-export default [
+export const tableEmits: VxeTableEmits = [
+  'ready',
+  'init-rendered',
+  'data-rendered',
+
   'update:data',
   'keydown-start',
   'keydown',
@@ -8,7 +12,18 @@ export default [
   'paste',
   'copy',
   'cut',
-  'current-change',
+  'context-menu',
+
+  'columns-change',
+  'data-change',
+  'footer-data-change',
+
+  'current-change', // 已废弃
+
+  'current-row-change',
+  'current-row-disabled',
+  'current-column-change',
+  'current-column-disabled',
   'radio-change',
   'checkbox-change',
   'checkbox-all',
@@ -23,6 +38,7 @@ export default [
   'cell-mouseleave',
   'cell-selected',
   'cell-delete-value',
+  'cell-backspace-value',
   'header-cell-click',
   'header-cell-dblclick',
   'header-cell-menu',
@@ -32,14 +48,32 @@ export default [
   'clear-merge',
   'sort-change',
   'clear-sort',
+  'clear-all-sort',
   'filter-change',
   'filter-visible',
   'clear-filter',
-  'resizable-change',
+  'clear-all-filter',
+
+  'resizable-change', // 废弃
+
+  'column-resizable-change',
+  'row-resizable-change',
+  'toggle-row-group-expand',
   'toggle-row-expand',
   'toggle-tree-expand',
   'menu-click',
   'edit-closed',
+
+  'row-dragstart',
+  'row-dragover',
+  'row-dragend',
+  'row-remove-dragend',
+  'row-insert-dragend',
+  'column-dragstart',
+  'column-dragover',
+  'column-dragend',
+
+  'enter-append-row',
 
   'edit-actived', // 废弃
 
@@ -47,7 +81,12 @@ export default [
   'edit-disabled',
   'valid-error',
   'scroll',
+  'scroll-boundary',
   'custom',
+  'custom-visible-change',
+  'custom-visible-all',
+  'custom-fixed-change',
+  'custom-sort-change',
 
   'change-fnr', // 废弃
 
@@ -63,6 +102,7 @@ export default [
   'cell-area-cut',
   'cell-area-paste',
   'cell-area-merge',
+  'clear-cell-area-selection',
   'clear-cell-area-merge',
   'header-cell-area-selection',
   'cell-area-selection-invalid',
@@ -72,10 +112,11 @@ export default [
   'cell-area-extension-start',
   'cell-area-extension-drag',
   'cell-area-extension-end',
+  'cell-area-extension-fill',
   'cell-area-selection-all-start',
   'cell-area-selection-all-end',
   'cell-area-arrows-start',
   'cell-area-arrows-end',
   'active-cell-change-start',
   'active-cell-change-end'
-] as VxeTableEmits
+]

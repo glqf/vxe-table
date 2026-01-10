@@ -2,7 +2,22 @@ import XEUtils from 'xe-utils'
 
 const reClsMap: { [key: string]: any } = {}
 
-export const browse = XEUtils.browse()
+let tpImgEl: HTMLImageElement | undefined
+
+export function initTpImg () {
+  if (!tpImgEl) {
+    tpImgEl = new Image()
+    tpImgEl.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+  }
+  return tpImgEl
+}
+
+export function getTpImg () {
+  if (!tpImgEl) {
+    return initTpImg()
+  }
+  return tpImgEl
+}
 
 export function getPropClass (property: any, params: any) {
   return property ? XEUtils.isFunction(property) ? property(params) : property : ''
@@ -32,15 +47,15 @@ function getNodeOffset (elem: any, container: any, rest: any): any {
 }
 
 export function isPx (val: any) {
-  return val && /^\d+(px)?$/.test(val)
+  return val && /^\d+(\.\d+)?(px)?$/.test(val)
 }
 
 export function isScale (val: any) {
-  return val && /^\d+%$/.test(val)
+  return val && /^\d+(\.\d+)?%$/.test(val)
 }
 
 export function hasClass (elem: any, cls: any) {
-  return elem && elem.className && elem.className.match && elem.className.match(getClsRE(cls))
+  return !!(elem && elem.className && elem.className.match && elem.className.match(getClsRE(cls)))
 }
 
 export function removeClass (elem: any, cls: any) {
@@ -56,6 +71,24 @@ export function addClass (elem: any, cls: string) {
   }
 }
 
+export function hasControlKey (evnt: KeyboardEvent | MouseEvent | DragEvent) {
+  return evnt.ctrlKey || evnt.metaKey
+}
+
+export function toCssUnit (val?: number | string, unit = 'px') {
+  if (XEUtils.isNumber(val) || /^\d+$/.test(`${val}`)) {
+    return `${val}${unit}`
+  }
+  return `${val || ''}`
+}
+
+export function queryElement (elem: HTMLTableCellElement, selector: string) {
+  if (elem) {
+    return elem.querySelector<HTMLElement>(selector)
+  }
+  return null
+}
+
 export function getDomNode () {
   const documentElement = document.documentElement
   const bodyElem = document.body
@@ -67,7 +100,7 @@ export function getDomNode () {
   }
 }
 
-export function getOffsetHeight (elem: HTMLElement) {
+export function getOffsetHeight (elem?: HTMLElement) {
   return elem ? elem.offsetHeight : 0
 }
 
@@ -81,13 +114,13 @@ export function getPaddingTopBottomSize (elem: HTMLElement) {
   return 0
 }
 
-export function setScrollTop (elem: HTMLElement | null, scrollTop: number) {
+export function setScrollTop (elem: HTMLElement | null | undefined, scrollTop: number) {
   if (elem) {
     elem.scrollTop = scrollTop
   }
 }
 
-export function setScrollLeft (elem: HTMLElement | null, scrollLeft: number) {
+export function setScrollLeft (elem: HTMLElement | null | undefined, scrollLeft: number) {
   if (elem) {
     elem.scrollLeft = scrollLeft
   }
@@ -105,6 +138,24 @@ export function updateCellTitle (overflowElem: any, column: any) {
   if (overflowElem.getAttribute('title') !== content) {
     overflowElem.setAttribute('title', content)
   }
+}
+
+export function checkTargetElement (target: HTMLElement | EventTarget | null, exEls: (HTMLElement | null)[], endEl?: HTMLElement | EventTarget | null) {
+  let targetEl = target
+  if (!exEls || !exEls.length) {
+    return false
+  }
+  const [exEl1, exEl2, exEl3] = exEls
+  while (targetEl) {
+    if (exEl1 === targetEl || (exEl2 && targetEl === exEl2) || (exEl3 && targetEl === exEl3)) {
+      return true
+    }
+    if (endEl && targetEl === endEl) {
+      return false
+    }
+    targetEl = (targetEl as HTMLElement).parentElement
+  }
+  return false
 }
 
 /**
@@ -160,4 +211,26 @@ export function triggerEvent (targetElem: Element, type: string) {
 
 export function isNodeElement (elem: any): elem is HTMLElement {
   return elem && elem.nodeType === 1
+}
+
+export function scrollTopTo (diffNum: number, cb: (progress: number) => void) {
+  const duration = Math.abs(diffNum)
+  const startTime = performance.now()
+  let countTop = 0
+  const step = (timestamp: number) => {
+    let progress = (timestamp - startTime) / duration
+    if (progress < 0) {
+      progress = 0
+    } else if (progress > 1) {
+      progress = 1
+    }
+    const easedProgress = Math.pow(progress, 2)
+    const offsetTop = Math.floor((diffNum * easedProgress)) - countTop
+    countTop += offsetTop
+    cb(offsetTop)
+    if (progress < 1) {
+      requestAnimationFrame(step)
+    }
+  }
+  requestAnimationFrame(step)
 }

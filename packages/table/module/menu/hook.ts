@@ -14,7 +14,11 @@ hooks.add('tableMenuModule', {
   setupTable ($xeTable) {
     const { xID, props, reactData, internalData } = $xeTable
     const { refElem, refTableFilter, refTableMenu } = $xeTable.getRefMaps()
-    const { computeMouseOpts, computeIsMenu, computeMenuOpts } = $xeTable.getComputeMaps()
+    const { computeMouseOpts, computeIsContentMenu, computeMenuOpts } = $xeTable.getComputeMaps()
+
+    const $xeGrid = $xeTable.xeGrid
+    const $xeGantt = $xeTable.xeGantt
+    const $xeGGWrapper = $xeGrid || $xeGantt
 
     let menuMethods = {} as TableMenuMethods
     let menuPrivateMethods = {} as TableMenuPrivateMethods
@@ -24,23 +28,34 @@ hooks.add('tableMenuModule', {
      */
     const handleOpenMenuEvent = (evnt: any, type: 'header' | 'body' | 'footer', params: any) => {
       const { ctxMenuStore } = reactData
-      const isMenu = computeIsMenu.value
+      const isContentMenu = computeIsContentMenu.value
       const menuOpts = computeMenuOpts.value
       const config = menuOpts[type]
-      const visibleMethod = menuOpts.visibleMethod
+      const { transfer, visibleMethod } = menuOpts
       if (config) {
         const { options, disabled } = config
         if (disabled) {
           evnt.preventDefault()
-        } else if (isMenu && options && options.length) {
+        } else if (isContentMenu && options && options.length) {
           params.options = options
           $xeTable.preventEvent(evnt, 'event.showMenu', params, () => {
             if (!visibleMethod || visibleMethod(params)) {
               evnt.preventDefault()
               $xeTable.updateZindex()
+              const el = $xeGGWrapper ? $xeGGWrapper.getRefMaps().refElem.value : refElem.value
+              if (!el) {
+                return
+              }
+              const tableRect = el.getBoundingClientRect()
               const { scrollTop, scrollLeft, visibleHeight, visibleWidth } = getDomNode()
-              let top = evnt.clientY + scrollTop
-              let left = evnt.clientX + scrollLeft
+
+              let top = evnt.clientY - tableRect.y
+              let left = evnt.clientX - tableRect.x
+              if (transfer) {
+                top = evnt.clientY + scrollTop
+                left = evnt.clientX + scrollLeft
+              }
+
               const handleVisible = () => {
                 internalData._currMenuParams = params
                 Object.assign(ctxMenuStore, {
@@ -74,7 +89,7 @@ hooks.add('tableMenuModule', {
               const { keyboard, row, column } = params
               if (keyboard && row && column) {
                 $xeTable.scrollToRow(row, column).then(() => {
-                  const cell = $xeTable.getCell(row, column)
+                  const cell = $xeTable.getCellElement(row, column)
                   if (cell) {
                     const { boundingTop, boundingLeft } = getAbsolutePos(cell)
                     top = boundingTop + scrollTop + Math.floor(cell.offsetHeight / 2)
@@ -140,7 +155,7 @@ hooks.add('tableMenuModule', {
           }
           ctxMenuStore[property] = selectItem || menuList[0]
         } else if (ctxMenuStore[property] && (globalEvents.hasKey(evnt, GLOBAL_EVENT_KEYS.ENTER) || globalEvents.hasKey(evnt, GLOBAL_EVENT_KEYS.SPACEBAR))) {
-          menuPrivateMethods.ctxMenuLinkEvent(evnt, ctxMenuStore[property])
+          $xeTable.ctxMenuLinkEvent(evnt, ctxMenuStore[property])
         }
       },
       handleOpenMenuEvent,
@@ -148,6 +163,9 @@ hooks.add('tableMenuModule', {
        * 快捷菜单事件处理
        */
       handleGlobalContextmenuEvent (evnt) {
+        const $xeGrid = $xeTable.xeGrid
+        const $xeGantt = $xeTable.xeGantt
+
         const { mouseConfig, menuConfig } = props
         const { editStore, ctxMenuStore } = reactData
         const { visibleColumn } = internalData
@@ -165,7 +183,7 @@ hooks.add('tableMenuModule', {
           }
           if (internalData._keyCtx) {
             const type = 'body'
-            const params: any = { type, $table: $xeTable, keyboard: true, columns: visibleColumn.slice(0), $event: evnt }
+            const params: any = { source: 'table', type, $table: $xeTable, $grid: $xeGrid, $gantt: $xeGantt, keyboard: true, columns: visibleColumn.slice(0), $event: evnt }
             // 如果开启单元格区域
             if (mouseConfig && mouseOpts.area) {
               const activeArea = $xeTable.getActiveCellArea()
@@ -192,7 +210,7 @@ hooks.add('tableMenuModule', {
               // target=td|th，直接向上找 table 去匹配即可
               return target.parentNode.parentNode.parentNode.getAttribute('xid') === xID
             })
-            const params: any = { type: layout, $table: $xeTable, columns: visibleColumn.slice(0), $event: evnt }
+            const params: any = { source: 'table', type: layout, $table: $xeTable, $grid: $xeGrid, $gantt: $xeGantt, columns: visibleColumn.slice(0), $event: evnt }
             if (columnTargetNode.flag) {
               const cell = columnTargetNode.targetElem
               const columnNodeRest = $xeTable.getColumnNode(cell)
@@ -214,7 +232,7 @@ hooks.add('tableMenuModule', {
               handleOpenMenuEvent(evnt, layout, params)
               $xeTable.dispatchEvent(eventType, params, evnt)
               return
-            } else if (getEventTargetNode(evnt, el, `vxe-table--${layout}-wrapper`, target => target.getAttribute('xid') === xID).flag) {
+            } else if (getEventTargetNode(evnt, el, `vxe-table--${layout}-wrapper`, target => target.getAttribute('xid') === xID).flag || (layout === 'body' && getEventTargetNode(evnt, el, 'vxe-table--empty-place-wrapper', target => target.getAttribute('xid') === xID).flag)) {
               if (menuOpts.trigger === 'cell') {
                 evnt.preventDefault()
               } else {
@@ -224,13 +242,13 @@ hooks.add('tableMenuModule', {
             }
           }
         }
-        if (tableFilter && !getEventTargetNode(evnt, tableFilter.$el).flag) {
+        if (tableFilter && !getEventTargetNode(evnt, tableFilter.getRefMaps().refElem.value).flag) {
           $xeTable.closeFilter()
         }
         menuMethods.closeMenu()
       },
       ctxMenuMouseoverEvent (evnt, item, child) {
-        const menuElem = evnt.currentTarget
+        const menuElem = evnt.currentTarget as HTMLDivElement
         const { ctxMenuStore } = reactData
         evnt.preventDefault()
         evnt.stopPropagation()
@@ -240,7 +258,7 @@ hooks.add('tableMenuModule', {
           ctxMenuStore.showChild = hasChildrenList(item)
           if (ctxMenuStore.showChild) {
             nextTick(() => {
-              const childWrapperElem = menuElem.nextElementSibling
+              const childWrapperElem = menuElem.nextElementSibling as HTMLDivElement
               if (childWrapperElem) {
                 const { boundingTop, boundingLeft, visibleHeight, visibleWidth } = getAbsolutePos(menuElem)
                 const posTop = boundingTop + menuElem.offsetHeight
@@ -279,12 +297,16 @@ hooks.add('tableMenuModule', {
        * 快捷菜单点击事件
        */
       ctxMenuLinkEvent (evnt, menu) {
+        const $xeGrid = $xeTable.xeGrid
+        const $xeGantt = $xeTable.xeGantt
+
         // 如果一级菜单有配置 code 则允许点击，否则不能点击
-        if (!menu.disabled && (menu.code || !menu.children || !menu.children.length)) {
+        if (!menu.loading && !menu.disabled && (menu.code || !menu.children || !menu.children.length)) {
           const gMenuOpts = menus.get(menu.code)
-          const params = Object.assign({}, internalData._currMenuParams, { menu, $table: $xeTable, $grid: $xeTable.xegrid, $event: evnt })
-          if (gMenuOpts && gMenuOpts.menuMethod) {
-            gMenuOpts.menuMethod(params, evnt)
+          const params = Object.assign({}, internalData._currMenuParams, { menu, $table: $xeTable, $grid: $xeGrid, $gantt: $xeGantt, $event: evnt })
+          const tmMethod = gMenuOpts ? (gMenuOpts.tableMenuMethod || gMenuOpts.menuMethod) : null
+          if (tmMethod) {
+            tmMethod(params, evnt)
           }
           $xeTable.dispatchEvent('menu-click', params, evnt)
           menuMethods.closeMenu()
@@ -296,5 +318,8 @@ hooks.add('tableMenuModule', {
   },
   setupGrid ($xeGrid) {
     return $xeGrid.extendTableMethods(tableMenuMethodKeys)
+  },
+  setupGantt ($xeGantt) {
+    return $xeGantt.extendTableMethods(tableMenuMethodKeys)
   }
 })

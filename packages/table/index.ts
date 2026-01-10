@@ -1,14 +1,9 @@
 import { App } from 'vue'
 import { VxeUI } from '../ui'
 import VxeTableComponent from './src/table'
-import './module/filter/hook'
-import './module/menu/hook'
-import './module/edit/hook'
-import './module/export/hook'
-import './module/keyboard/hook'
-import './module/validator/hook'
-import './module/custom/hook'
-import './render'
+import { useCellView } from './src/use'
+
+import type { TableHandleExport } from '../../types'
 
 export const VxeTable = Object.assign({}, VxeTableComponent, {
   install (app: App) {
@@ -16,9 +11,16 @@ export const VxeTable = Object.assign({}, VxeTableComponent, {
   }
 })
 
+const tableHandle: TableHandleExport = {
+  useCellView
+}
+
 if (VxeUI.dynamicApp) {
   VxeUI.dynamicApp.component(VxeTableComponent.name as string, VxeTableComponent)
 }
+
+VxeUI.component(VxeTableComponent)
+VxeUI.tableHandle = tableHandle
 
 export const Table = VxeTable
 export default VxeTable

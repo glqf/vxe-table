@@ -3,25 +3,27 @@ import XEUtils from 'xe-utils'
 import { VxeUI } from '../../../ui'
 import { isEnableConf } from '../../../ui/src/utils'
 import { getCellValue, setCellValue, getRowid } from '../../src/util'
-import { browse, removeClass, addClass } from '../../../ui/src/dom'
+import { removeClass, addClass } from '../../../ui/src/dom'
 import { warnLog, errLog } from '../../../ui/src/log'
 
-import type { TableEditMethods, TableEditPrivateMethods } from '../../../../types'
+import type { TableEditMethods, TableEditPrivateMethods, VxeTableDefines } from '../../../../types'
 
 const { getConfig, renderer, hooks, getI18n } = VxeUI
 
-const tableEditMethodKeys: (keyof TableEditMethods)[] = ['insert', 'insertAt', 'insertNextAt', 'remove', 'removeCheckboxRow', 'removeRadioRow', 'removeCurrentRow', 'getRecordset', 'getInsertRecords', 'getRemoveRecords', 'getUpdateRecords', 'getEditRecord', 'getActiveRecord', 'getSelectedCell', 'clearEdit', 'clearActived', 'clearSelected', 'isEditByRow', 'isActiveByRow', 'setEditRow', 'setActiveRow', 'setEditCell', 'setActiveCell', 'setSelectCell']
+const tableEditMethodKeys: (keyof TableEditMethods)[] = ['insert', 'insertAt', 'insertNextAt', 'insertChild', 'insertChildAt', 'insertChildNextAt', 'remove', 'removeCheckboxRow', 'removeRadioRow', 'removeCurrentRow', 'getRecordset', 'getInsertRecords', 'getRemoveRecords', 'getUpdateRecords', 'getEditRecord', 'getActiveRecord', 'getEditCell', 'getSelectedCell', 'clearEdit', 'clearActived', 'clearSelected', 'isEditByRow', 'isActiveByRow', 'setEditRow', 'setActiveRow', 'setEditCell', 'setActiveCell', 'setSelectCell']
 
 hooks.add('tableEditModule', {
   setupTable ($xeTable) {
     const { props, reactData, internalData } = $xeTable
     const { refElem } = $xeTable.getRefMaps()
-    const { computeMouseOpts, computeEditOpts, computeCheckboxOpts, computeTreeOpts } = $xeTable.getComputeMaps()
+    const { computeMouseOpts, computeEditOpts, computeCheckboxOpts, computeTreeOpts, computeValidOpts } = $xeTable.getComputeMaps()
+
+    const browseObj = XEUtils.browse()
 
     let editMethods = {} as TableEditMethods
     let editPrivateMethods = {} as TableEditPrivateMethods
 
-    const getEditColumnModel = (row: any, column: any) => {
+    const getEditColumnModel = (row: any, column: VxeTableDefines.ColumnInfo) => {
       const { model, editRender } = column
       if (editRender) {
         model.value = getCellValue(row, column)
@@ -29,7 +31,7 @@ hooks.add('tableEditModule', {
       }
     }
 
-    const setEditColumnModel = (row: any, column: any) => {
+    const setEditColumnModel = (row: any, column: VxeTableDefines.ColumnInfo) => {
       const { model, editRender } = column
       if (editRender && model.update) {
         setCellValue(row, column, model.value)
@@ -48,21 +50,21 @@ hooks.add('tableEditModule', {
       }
     }
 
-    function syncActivedCell () {
+    const syncActivedCell = () => {
       const { editStore, tableColumn } = reactData
       const editOpts = computeEditOpts.value
       const { actived } = editStore
       const { row, column } = actived
       if (row || column) {
         if (editOpts.mode === 'row') {
-          tableColumn.forEach((column: any) => setEditColumnModel(row, column))
+          tableColumn.forEach((column) => setEditColumnModel(row, column))
         } else {
           setEditColumnModel(row, column)
         }
       }
     }
 
-    function insertTreeRow (newRecords: any[], isAppend: boolean) {
+    const insertTreeRow = (newRecords: any[], isAppend: boolean) => {
       const { tableFullTreeData, afterFullData, fullDataRowIdData, fullAllDataRowIdData } = internalData
       const treeOpts = computeTreeOpts.value
       const { rowField, parentField, mapChildrenField } = treeOpts
@@ -76,137 +78,180 @@ hooks.add('tableEditModule', {
           const { item: parentRow } = matchObj
           const parentRest = fullAllDataRowIdData[getRowid($xeTable, parentRow)]
           const parentLevel = parentRest ? parentRest.level : 0
-          let parentChilds = parentRow[childrenField]
-          let mapChilds = parentRow[mapChildrenField]
-          if (!XEUtils.isArray(parentChilds)) {
-            parentChilds = parentRow[childrenField] = []
+          let pChilds = parentRow[childrenField]
+          let pMapChilds = parentRow[mapChildrenField]
+          if (!XEUtils.isArray(pChilds)) {
+            pChilds = parentRow[childrenField] = []
           }
-          if (!XEUtils.isArray(mapChilds)) {
-            mapChilds = parentRow[childrenField] = []
+          if (!XEUtils.isArray(pMapChilds)) {
+            pMapChilds = parentRow[mapChildrenField] = []
           }
-          parentChilds[funcName](item)
-          mapChilds[funcName](item)
-          const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, $index: -1, items: parentChilds, parent: parentRow, level: parentLevel + 1 }
+          pChilds[funcName](item)
+          pMapChilds[funcName](item)
+          const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, $index: -1, treeIndex: -1, _tIndex: -1, items: pChilds, parent: parentRow, level: parentLevel + 1, height: 0, resizeHeight: 0, oTop: 0, expandHeight: 0 }
           fullDataRowIdData[rowid] = rest
           fullAllDataRowIdData[rowid] = rest
         } else {
-          if (process.env.VUE_APP_VXE_ENV === 'development') {
-            if (parentRowId) {
-              warnLog('vxe.error.unableInsert')
-            }
+          if (parentRowId) {
+            warnLog('vxe.error.unableInsert')
           }
           afterFullData[funcName](item)
           tableFullTreeData[funcName](item)
-          const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, $index: -1, items: tableFullTreeData, parent: null, level: 0 }
+          const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, $index: -1, treeIndex: -1, _tIndex: -1, items: tableFullTreeData, parent: null, level: 0, height: 0, resizeHeight: 0, oTop: 0, expandHeight: 0 }
           fullDataRowIdData[rowid] = rest
           fullAllDataRowIdData[rowid] = rest
         }
       })
     }
 
-    const handleInsertRowAt = (records: any, row: any, isInsertNextRow?: boolean) => {
+    // const insertGroupRow = (newRecords: any[], isAppend: boolean) => {
+
+    // }
+
+    const handleInsertRowAt = (records: any, targetRowOrRowid: any, isInsertNextRow?: boolean) => {
       const { treeConfig } = props
-      const { mergeList, editStore } = reactData
-      const { tableFullTreeData, afterFullData, tableFullData, fullDataRowIdData, fullAllDataRowIdData } = internalData
+      const { isRowGroupStatus } = reactData
+      const { tableFullTreeData, afterFullData, mergeBodyList, tableFullData, fullDataRowIdData, fullAllDataRowIdData, insertRowMaps, removeRowMaps } = internalData
       const treeOpts = computeTreeOpts.value
-      const { transform, rowField, mapChildrenField } = treeOpts
+      const { transform, parentField, rowField, mapChildrenField } = treeOpts
       const childrenField = treeOpts.children || treeOpts.childrenField
       if (!XEUtils.isArray(records)) {
         records = [records]
       }
+      let targetRow = targetRowOrRowid
+      if (XEUtils.isString(targetRowOrRowid) || XEUtils.isNumber(targetRowOrRowid)) {
+        const rowRest = fullAllDataRowIdData[targetRowOrRowid]
+        if (rowRest) {
+          targetRow = rowRest.row
+        }
+      }
       const newRecords: any[] = reactive($xeTable.defineField(records.map((record: any) => Object.assign(treeConfig && transform ? { [mapChildrenField]: [], [childrenField]: [] } : {}, record))))
-      if (XEUtils.eqNull(row)) {
+      let treeRecords: any[] = []
+      if (treeConfig && transform) {
+        treeRecords = XEUtils.toArrayTree(newRecords, { key: rowField, parentKey: parentField, children: childrenField })
+      }
+      if (XEUtils.eqNull(targetRow)) {
         // 如果为虚拟树
         if (treeConfig && transform) {
           insertTreeRow(newRecords, false)
+        } else if (isRowGroupStatus) {
+          // 如果分组
+          if (treeConfig) {
+            throw new Error(getI18n('vxe.error.noTree', ['insert']))
+          }
+          errLog(getI18n('vxe.error.noGroup', ['insert']))
+          // insertGroupRow(newRecords, false)
         } else {
-          afterFullData.unshift(...newRecords)
-          tableFullData.unshift(...newRecords)
+          newRecords.forEach(item => {
+            const rowid = getRowid($xeTable, item)
+            const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, $index: -1, treeIndex: -1, _tIndex: -1, items: afterFullData, parent: null, level: 0, height: 0, resizeHeight: 0, oTop: 0, expandHeight: 0 }
+            fullDataRowIdData[rowid] = rest
+            fullAllDataRowIdData[rowid] = rest
+            afterFullData.unshift(item)
+            tableFullData.unshift(item)
+          })
           // 刷新单元格合并
-          mergeList.forEach((mergeItem: any) => {
+          mergeBodyList.forEach((mergeItem: any) => {
             const { row: mergeRowIndex } = mergeItem
-            if (mergeRowIndex > 0) {
+            if (mergeRowIndex >= 0) {
               mergeItem.row = mergeRowIndex + newRecords.length
             }
           })
         }
       } else {
-        if (row === -1) {
+        if (targetRow === -1) {
           // 如果为虚拟树
           if (treeConfig && transform) {
             insertTreeRow(newRecords, true)
+          } else if (isRowGroupStatus) {
+            // 如果分组
+            if (treeConfig) {
+              throw new Error(getI18n('vxe.error.noTree', ['insert']))
+            }
+            errLog(getI18n('vxe.error.noGroup', ['insert']))
+            // insertGroupRow(newRecords, true)
           } else {
-            afterFullData.push(...newRecords)
-            tableFullData.push(...newRecords)
-            // 刷新单元格合并
-            mergeList.forEach((mergeItem: any) => {
-              const { row: mergeRowIndex, rowspan: mergeRowspan } = mergeItem
-              if (mergeRowIndex + mergeRowspan > afterFullData.length) {
-                mergeItem.rowspan = mergeRowspan + newRecords.length
-              }
+            newRecords.forEach(item => {
+              const rowid = getRowid($xeTable, item)
+              const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, treeIndex: -1, _tIndex: -1, $index: -1, items: afterFullData, parent: null, level: 0, height: 0, resizeHeight: 0, oTop: 0, expandHeight: 0 }
+              fullDataRowIdData[rowid] = rest
+              fullAllDataRowIdData[rowid] = rest
+              afterFullData.push(item)
+              tableFullData.push(item)
             })
           }
         } else {
           // 如果为虚拟树
           if (treeConfig && transform) {
-            const matchMapObj = XEUtils.findTree(tableFullTreeData, item => row[rowField] === item[rowField], { children: mapChildrenField })
+            const matchMapObj = XEUtils.findTree(tableFullTreeData, item => targetRow[rowField] === item[rowField], { children: mapChildrenField })
             if (matchMapObj) {
               const { parent: parentRow } = matchMapObj
               const parentMapChilds = parentRow ? parentRow[mapChildrenField] : tableFullTreeData
               const parentRest = fullAllDataRowIdData[getRowid($xeTable, parentRow)]
               const parentLevel = parentRest ? parentRest.level : 0
-              newRecords.forEach((item, i) => {
-                const rowid = getRowid($xeTable, item)
-                if (process.env.VUE_APP_VXE_ENV === 'development') {
-                  if (item[treeOpts.parentField]) {
-                    if (parentRow && item[treeOpts.parentField] !== parentRow[rowField]) {
-                      errLog('vxe.error.errProp', [`${treeOpts.parentField}=${item[treeOpts.parentField]}`, `${treeOpts.parentField}=${parentRow[rowField]}`])
-                    }
-                  }
-                }
+              treeRecords.forEach((row, i) => {
                 if (parentRow) {
-                  item[treeOpts.parentField] = parentRow[rowField]
+                  if (row[parentField] !== parentRow[rowField]) {
+                    errLog('vxe.error.errProp', [`${parentField}=${row[parentField]}`, `${parentField}=${parentRow[rowField]}`])
+                    row[parentField] = parentRow[rowField]
+                  }
+                } else {
+                  if (row[parentField] !== null) {
+                    if (!XEUtils.eqNull(row[parentField])) {
+                      errLog('vxe.error.errProp', [`${parentField}=${row[parentField]}`, 'null'])
+                    }
+                    row[parentField] = null
+                  }
                 }
                 let targetIndex = matchMapObj.index + i
                 if (isInsertNextRow) {
                   targetIndex = targetIndex + 1
                 }
-                parentMapChilds.splice(targetIndex, 0, item)
-                const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, $index: -1, items: parentMapChilds, parent: parentRow, level: parentLevel + 1 }
+                parentMapChilds.splice(targetIndex, 0, row)
+              })
+              XEUtils.eachTree(treeRecords, (item) => {
+                const rowid = getRowid($xeTable, item)
+                const rest = { row: item, rowid, seq: -1, index: -1, _index: -1, $index: -1, treeIndex: -1, _tIndex: -1, items: parentMapChilds, parent: parentRow, level: parentLevel + 1, height: 0, resizeHeight: 0, oTop: 0, expandHeight: 0 }
+                if (item[childrenField]) {
+                  item[mapChildrenField] = item[childrenField]
+                }
                 fullDataRowIdData[rowid] = rest
                 fullAllDataRowIdData[rowid] = rest
-              })
-
+              }, { children: childrenField })
               // 源
               if (parentRow) {
-                const matchObj = XEUtils.findTree(tableFullTreeData, item => row[rowField] === item[rowField], { children: childrenField })
+                const matchObj = XEUtils.findTree(tableFullTreeData, item => targetRow[rowField] === item[rowField], { children: childrenField })
                 if (matchObj) {
                   const parentChilds = matchObj.items
                   let targetIndex = matchObj.index
                   if (isInsertNextRow) {
                     targetIndex = targetIndex + 1
                   }
-                  parentChilds.splice(targetIndex, 0, ...newRecords)
+                  parentChilds.splice(targetIndex, 0, ...treeRecords)
                 }
               }
             } else {
-              if (process.env.VUE_APP_VXE_ENV === 'development') {
-                warnLog('vxe.error.unableInsert')
-              }
+              warnLog('vxe.error.unableInsert')
               insertTreeRow(newRecords, true)
             }
+          } else if (isRowGroupStatus) {
+            // 如果分组
+            if (treeConfig) {
+              throw new Error(getI18n('vxe.error.noTree', ['insert']))
+            }
+            errLog(getI18n('vxe.error.noGroup', ['insert']))
           } else {
             if (treeConfig) {
               throw new Error(getI18n('vxe.error.noTree', ['insert']))
             }
             let afIndex = -1
             // 如果是可视索引
-            if (XEUtils.isNumber(row)) {
-              if (row < afterFullData.length) {
-                afIndex = row
+            if (XEUtils.isNumber(targetRow)) {
+              if (targetRow < afterFullData.length) {
+                afIndex = targetRow
               }
             } else {
-              afIndex = $xeTable.findRowIndexOf(afterFullData, row)
+              afIndex = $xeTable.findRowIndexOf(afterFullData, targetRow)
             }
             // 如果是插入指定行的下一行
             if (isInsertNextRow) {
@@ -216,38 +261,61 @@ hooks.add('tableEditModule', {
               throw new Error(getI18n('vxe.error.unableInsert'))
             }
             afterFullData.splice(afIndex, 0, ...newRecords)
-            tableFullData.splice($xeTable.findRowIndexOf(tableFullData, row), 0, ...newRecords)
+            const tfIndex = $xeTable.findRowIndexOf(tableFullData, targetRow)
+            if (tfIndex > -1) {
+              tableFullData.splice(tfIndex + (isInsertNextRow ? 1 : 0), 0, ...newRecords)
+            } else {
+              tableFullData.push(...newRecords)
+            }
             // 刷新单元格合并
-            mergeList.forEach((mergeItem: any) => {
+            mergeBodyList.forEach((mergeItem: any) => {
               const { row: mergeRowIndex, rowspan: mergeRowspan } = mergeItem
-              if (mergeRowIndex > afIndex) {
+              if (mergeRowIndex >= afIndex) {
                 mergeItem.row = mergeRowIndex + newRecords.length
-              } else if (mergeRowIndex + mergeRowspan > afIndex) {
+              } else if (isInsertNextRow ? (mergeRowIndex + mergeRowspan >= afIndex) : (mergeRowIndex + mergeRowspan > afIndex)) {
                 mergeItem.rowspan = mergeRowspan + newRecords.length
               }
             })
           }
         }
       }
-      const { insertMaps } = editStore
-      newRecords.forEach(newRow => {
+
+      const handleStatus = (newRow: any) => {
         const rowid = getRowid($xeTable, newRow)
-        insertMaps[rowid] = newRow
-      })
-      $xeTable.cacheRowMap()
+        // 如果是被删除的数据，则还原状态
+        if (removeRowMaps[rowid]) {
+          delete removeRowMaps[rowid]
+          if (insertRowMaps[rowid]) {
+            delete insertRowMaps[rowid]
+          }
+        } else {
+          insertRowMaps[rowid] = newRow
+        }
+      }
+      // 如果为虚拟树
+      if (treeConfig && transform) {
+        XEUtils.eachTree(treeRecords, handleStatus, { children: mapChildrenField })
+      } else {
+        newRecords.forEach(handleStatus)
+      }
+
+      reactData.removeRowFlag++
+      reactData.insertRowFlag++
+      $xeTable.cacheRowMap(false)
       $xeTable.updateScrollYStatus()
       $xeTable.handleTableData(treeConfig && transform)
       if (!(treeConfig && transform)) {
         $xeTable.updateAfterDataIndex()
       }
       $xeTable.updateFooter()
+      $xeTable.handleUpdateBodyMerge()
       $xeTable.checkSelectionStatus()
       if (reactData.scrollYLoad) {
         $xeTable.updateScrollYSpace()
       }
       return nextTick().then(() => {
         $xeTable.updateCellAreas()
-        return $xeTable.recalculate()
+        return $xeTable.recalculate(true)
       }).then(() => {
         return {
           row: newRecords.length ? newRecords[newRecords.length - 1] : null,
@@ -256,13 +324,201 @@ hooks.add('tableEditModule', {
       })
     }
 
+    const handleInsertChildRowAt = (records: any, parentRowOrParentId: any, targetRow: any, isInsertNextRow?: boolean) => {
+      const { treeConfig } = props
+      const { fullAllDataRowIdData } = internalData
+      const treeOpts = computeTreeOpts.value
+      const { transform, rowField, parentField } = treeOpts
+      if (treeConfig && transform) {
+        if (!XEUtils.isArray(records)) {
+          records = [records]
+        }
+        let parentRow = parentRowOrParentId
+        if (XEUtils.isString(parentRowOrParentId) || XEUtils.isNumber(parentRowOrParentId)) {
+          const rowRest = fullAllDataRowIdData[parentRowOrParentId]
+          if (rowRest) {
+            parentRow = rowRest.row
+          }
+        }
+        return handleInsertRowAt(records.map((item: any) => Object.assign({}, item, { [parentField]: parentRow[rowField] })), targetRow, isInsertNextRow)
+      } else {
+        errLog('vxe.error.errProp', ['tree-config.transform=false', 'tree-config.transform=true'])
+      }
+      return Promise.resolve({ row: null, rows: [] })
+    }
+
+    const handleClearEdit = (evnt: Event | null, targetRow?: any) => {
+      const { editStore } = reactData
+      const { actived, focused } = editStore
+      const { row, column } = actived
+      const validOpts = computeValidOpts.value
+      if (row || column) {
+        if (targetRow && getRowid($xeTable, targetRow) !== getRowid($xeTable, row)) {
+          return nextTick()
+        }
+        syncActivedCell()
+        actived.args = null
+        actived.row = null
+        actived.column = null
+        $xeTable.updateFooter()
+        $xeTable.dispatchEvent('edit-closed', {
+          row,
+          rowIndex: $xeTable.getRowIndex(row),
+          $rowIndex: $xeTable.getVMRowIndex(row),
+          column,
+          columnIndex: $xeTable.getColumnIndex(column),
+          $columnIndex: $xeTable.getVMColumnIndex(column)
+        }, evnt || null)
+      }
+      focused.row = null
+      focused.column = null
+      if (validOpts.autoClear) {
+        if (validOpts.msgMode !== 'full' || getConfig().cellVaildMode === 'obsolete') {
+          if ($xeTable.clearValidate) {
+            return $xeTable.clearValidate()
+          }
+        }
+      }
+      return nextTick().then(() => $xeTable.updateCellAreas())
+    }
+
+    const handleEditActive = (params: any, evnt: Event | null, isFocus: boolean, isPos: boolean) => {
+      const $xeGrid = $xeTable.xeGrid
+      const $xeGantt = $xeTable.xeGantt
+
+      const { editConfig, mouseConfig } = props
+      const { editStore, tableColumn } = reactData
+      const editOpts = computeEditOpts.value
+      const { mode } = editOpts
+      const { actived, focused } = editStore
+      const { row, column } = params
+      const { editRender } = column
+      const cell = (params.cell || $xeTable.getCellElement(row, column))
+      const beforeEditMethod = editOpts.beforeEditMethod || editOpts.activeMethod
+      params.cell = cell
+      if (cell && isEnableConf(editConfig) && isEnableConf(editRender)) {
+        // 激活编辑
+        if (!$xeTable.isPendingByRow(row) && !$xeTable.isAggregateRecord(row)) {
+          if (actived.row !== row || (mode === 'cell' ? actived.column !== column : false)) {
+            // 判断是否禁用编辑
+            let type: 'edit-disabled' | 'edit-activated' = 'edit-disabled'
+            if (!beforeEditMethod || beforeEditMethod({ ...params, $table: $xeTable, $grid: $xeGrid, $gantt: $xeGantt })) {
+              if (mouseConfig) {
+                $xeTable.clearSelected()
+                if ($xeTable.clearCellAreas) {
+                  $xeTable.clearCellAreas()
+                  $xeTable.clearCopyCellArea()
+                }
+              }
+              $xeTable.closeTooltip()
+              if (actived.column) {
+                handleClearEdit(evnt)
+              }
+              type = 'edit-activated'
+              column.renderHeight = cell.offsetHeight
+              actived.args = params
+              actived.row = row
+              actived.column = column
+              if (mode === 'row') {
+                tableColumn.forEach((column: any) => getEditColumnModel(row, column))
+              } else {
+                getEditColumnModel(row, column)
+              }
+              const afterEditMethod = editOpts.afterEditMethod
+              nextTick(() => {
+                if (isFocus) {
+                  $xeTable.handleFocus(params, evnt)
+                }
+                if (afterEditMethod) {
+                  afterEditMethod({ ...params, $table: $xeTable, $grid: $xeGrid, $gantt: $xeGantt })
+                }
+              })
+            }
+            $xeTable.dispatchEvent(type, {
+              row,
+              rowIndex: $xeTable.getRowIndex(row),
+              $rowIndex: $xeTable.getVMRowIndex(row),
+              column,
+              columnIndex: $xeTable.getColumnIndex(column),
+              $columnIndex: $xeTable.getVMColumnIndex(column)
+            }, evnt)
+
+            // v4已废弃
+            if (type === 'edit-activated') {
+              $xeTable.dispatchEvent('edit-actived', {
+                row,
+                rowIndex: $xeTable.getRowIndex(row),
+                $rowIndex: $xeTable.getVMRowIndex(row),
+                column,
+                columnIndex: $xeTable.getColumnIndex(column),
+                $columnIndex: $xeTable.getVMColumnIndex(column)
+              }, evnt)
+            }
+          } else {
+            const { column: oldColumn } = actived
+            if (mouseConfig) {
+              $xeTable.clearSelected()
+              if ($xeTable.clearCellAreas) {
+                $xeTable.clearCellAreas()
+                $xeTable.clearCopyCellArea()
+              }
+            }
+            if (oldColumn !== column) {
+              const { model: oldModel } = oldColumn
+              if (oldModel.update) {
+                setCellValue(row, oldColumn, oldModel.value)
+              }
+              if ($xeTable.clearValidate) {
+                $xeTable.clearValidate(row, column)
+              }
+            }
+            column.renderHeight = cell.offsetHeight
+            actived.args = params
+            actived.column = column
+            if (isPos) {
+              setTimeout(() => {
+                $xeTable.handleFocus(params, evnt)
+              })
+            }
+          }
+          focused.column = null
+          focused.row = null
+          $xeTable.focus()
+        }
+      }
+      return nextTick()
+    }
+
+    const handleEditCell = (row: any, fieldOrColumn: string | VxeTableDefines.ColumnInfo, isPos: boolean) => {
+      const { editConfig } = props
+      const column = XEUtils.isString(fieldOrColumn) ? $xeTable.getColumnByField(fieldOrColumn) : fieldOrColumn
+      if (row && column && isEnableConf(editConfig) && isEnableConf(column.editRender) && !$xeTable.isAggregateRecord(row)) {
+        return Promise.resolve(isPos ? $xeTable.scrollToRow(row, column) : null).then(() => {
+          const cell = $xeTable.getCellElement(row, column)
+          if (cell) {
+            handleEditActive({
+              row,
+              rowIndex: $xeTable.getRowIndex(row),
+              column,
+              columnIndex: $xeTable.getColumnIndex(column),
+              cell,
+              $table: $xeTable
+            }, null, isPos, isPos)
+            internalData._lastCallTime = Date.now()
+          }
+          return nextTick()
+        })
+      }
+      return nextTick()
+    }
+
     editMethods = {
       /**
        * 往表格中插入临时数据
        *
        * @param {*} records
        */
-      insert (records: any) {
+      insert (records) {
         return handleInsertRowAt(records, null)
       },
       /**
@@ -270,14 +526,22 @@ hooks.add('tableEditModule', {
        * 如果 row 为空则从插入到顶部，如果为树结构，则插入到目标节点顶部
        * 如果 row 为 -1 则从插入到底部，如果为树结构，则插入到目标节点底部
        * 如果 row 为有效行则插入到该行的位置，如果为树结构，则有插入到效的目标节点该行的位置
-       * @param {Object/Array} records 新的数据
-       * @param {Row} row 指定行
        */
-      insertAt (records: any, row: any) {
-        return handleInsertRowAt(records, row)
+      insertAt (records, targetRowOrRowid) {
+        return handleInsertRowAt(records, targetRowOrRowid)
       },
-      insertNextAt (records: any, row: any) {
-        return handleInsertRowAt(records, row, true)
+      insertNextAt (records, targetRowOrRowid) {
+        return handleInsertRowAt(records, targetRowOrRowid, true)
+      },
+      insertChild (records, parentRowOrParentId) {
+        (window as any).aa = internalData
+        return handleInsertChildRowAt(records, parentRowOrParentId, null)
+      },
+      insertChildAt (records, parentRowOrParentId, targetRow) {
+        return handleInsertChildRowAt(records, parentRowOrParentId, targetRow)
+      },
+      insertChildNextAt (records, parentRowOrParentId, targetRow) {
+        return handleInsertChildRowAt(records, parentRowOrParentId, targetRow, true)
       },
       /**
        * 删除指定行数据
@@ -287,13 +551,13 @@ hooks.add('tableEditModule', {
        */
       remove (rows: any) {
         const { treeConfig } = props
-        const { mergeList, editStore, selectCheckboxMaps } = reactData
-        const { tableFullTreeData, afterFullData, tableFullData } = internalData
+        const { editStore, isRowGroupStatus } = reactData
+        const { tableFullTreeData, selectCheckboxMaps, afterFullData, mergeBodyList, tableFullData, pendingRowMaps, insertRowMaps, removeRowMaps } = internalData
         const checkboxOpts = computeCheckboxOpts.value
         const treeOpts = computeTreeOpts.value
         const { transform, mapChildrenField } = treeOpts
         const childrenField = treeOpts.children || treeOpts.childrenField
-        const { actived, removeMaps, insertMaps } = editStore
+        const { actived } = editStore
         const { checkField } = checkboxOpts
         let delList: any[] = []
         if (!rows) {
@@ -305,19 +569,18 @@ hooks.add('tableEditModule', {
         rows.forEach((row: any) => {
           if (!$xeTable.isInsertByRow(row)) {
             const rowid = getRowid($xeTable, row)
-            removeMaps[rowid] = row
+            removeRowMaps[rowid] = row
           }
         })
         // 如果绑定了多选属性，则更新状态
         if (!checkField) {
-          const selectRowMaps = { ...selectCheckboxMaps }
           rows.forEach((row: any) => {
             const rowid = getRowid($xeTable, row)
-            if (selectRowMaps[rowid]) {
-              delete selectRowMaps[rowid]
+            if (selectCheckboxMaps[rowid]) {
+              delete selectCheckboxMaps[rowid]
             }
           })
-          reactData.selectCheckboxMaps = selectRowMaps
+          reactData.updateCheckboxFlag++
         }
         // 从数据源中移除
         if (tableFullData === rows) {
@@ -344,6 +607,9 @@ hooks.add('tableEditModule', {
                 afterFullData.splice(afIndex, 1)
               }
             })
+          } else if (isRowGroupStatus) {
+            // 如果分组
+            warnLog(getI18n('vxe.error.noGroup', ['remove']))
           } else {
             rows.forEach((row: any) => {
               const tfIndex = $xeTable.findRowIndexOf(tableFullData, row)
@@ -354,7 +620,7 @@ hooks.add('tableEditModule', {
               const afIndex = $xeTable.findRowIndexOf(afterFullData, row)
               if (afIndex > -1) {
                 // 刷新单元格合并
-                mergeList.forEach((mergeItem: any) => {
+                mergeBodyList.forEach((mergeItem) => {
                   const { row: mergeRowIndex, rowspan: mergeRowspan } = mergeItem
                   if (mergeRowIndex > afIndex) {
                     mergeItem.row = mergeRowIndex - 1
@@ -374,13 +640,20 @@ hooks.add('tableEditModule', {
         // 从新增中移除已删除的数据
         rows.forEach((row: any) => {
           const rowid = getRowid($xeTable, row)
-          if (insertMaps[rowid]) {
-            delete insertMaps[rowid]
+          if (insertRowMaps[rowid]) {
+            delete insertRowMaps[rowid]
+          }
+          if (pendingRowMaps[rowid]) {
+            delete pendingRowMaps[rowid]
           }
         })
-        $xeTable.updateFooter()
-        $xeTable.cacheRowMap()
+        reactData.removeRowFlag++
+        reactData.insertRowFlag++
+        reactData.pendingRowFlag++
+        $xeTable.cacheRowMap(false)
         $xeTable.handleTableData(treeConfig && transform)
+        $xeTable.updateFooter()
+        $xeTable.handleUpdateBodyMerge()
         if (!(treeConfig && transform)) {
           $xeTable.updateAfterDataIndex()
         }
@@ -390,7 +663,7 @@ hooks.add('tableEditModule', {
         }
         return nextTick().then(() => {
           $xeTable.updateCellAreas()
-          return $xeTable.recalculate()
+          return $xeTable.recalculate(true)
         }).then(() => {
           return { row: delList.length ? delList[delList.length - 1] : null, rows: delList }
         })
@@ -428,22 +701,27 @@ hooks.add('tableEditModule', {
        * 获取表格数据集，包含新增、删除、修改、标记
        */
       getRecordset () {
+        const removeRecords = editMethods.getRemoveRecords()
+        const pendingRecords = $xeTable.getPendingRecords()
+        const delRecords = removeRecords.concat(pendingRecords)
+        // 如果已经被删除，则无需放到更新数组
+        const updateRecords = editMethods.getUpdateRecords().filter(row => {
+          return !delRecords.some(item => $xeTable.eqRow(item, row))
+        })
         return {
           insertRecords: editMethods.getInsertRecords(),
-          removeRecords: editMethods.getRemoveRecords(),
-          updateRecords: editMethods.getUpdateRecords(),
-          pendingRecords: $xeTable.getPendingRecords()
+          removeRecords,
+          updateRecords,
+          pendingRecords
         }
       },
       /**
        * 获取新增的临时数据
        */
       getInsertRecords () {
-        const { editStore } = reactData
-        const { fullAllDataRowIdData } = internalData
-        const { insertMaps } = editStore
+        const { fullAllDataRowIdData, insertRowMaps } = internalData
         const insertRecords: any[] = []
-        XEUtils.each(insertMaps, (row, rowid) => {
+        XEUtils.each(insertRowMaps, (row, rowid) => {
           if (fullAllDataRowIdData[rowid]) {
             insertRecords.push(row)
           }
@@ -454,10 +732,9 @@ hooks.add('tableEditModule', {
        * 获取已删除的数据
        */
       getRemoveRecords () {
-        const { editStore } = reactData
-        const { removeMaps } = editStore
+        const { removeRowMaps } = internalData
         const removeRecords: any[] = []
-        XEUtils.each(removeMaps, (row) => {
+        XEUtils.each(removeRowMaps, (row) => {
           removeRecords.push(row)
         })
         return removeRecords
@@ -481,18 +758,35 @@ hooks.add('tableEditModule', {
         return []
       },
       getActiveRecord () {
-        if (process.env.VUE_APP_VXE_ENV === 'development') {
-          warnLog('vxe.error.delFunc', ['getActiveRecord', 'getEditRecord'])
+        warnLog('vxe.error.delFunc', ['getActiveRecord', 'getEditCell'])
+        const { editStore } = reactData
+        const { fullAllDataRowIdData } = internalData
+        const { args, row } = editStore.actived
+        if (args && row && fullAllDataRowIdData[getRowid($xeTable, row)]) {
+          return Object.assign({}, args, { row })
         }
-        return this.getEditRecord()
+        return null
       },
       getEditRecord () {
+        warnLog('vxe.error.delFunc', ['getEditRecord', 'getEditCell'])
         const { editStore } = reactData
-        const { afterFullData } = internalData
-        const el = refElem.value
+        const { fullAllDataRowIdData } = internalData
         const { args, row } = editStore.actived
-        if (args && $xeTable.findRowIndexOf(afterFullData, row) > -1 && el.querySelectorAll('.vxe-body--column.col--active').length) {
-          return Object.assign({}, args)
+        if (args && row && fullAllDataRowIdData[getRowid($xeTable, row)]) {
+          return Object.assign({}, args, { row })
+        }
+        return null
+      },
+      getEditCell () {
+        const { editStore } = reactData
+        const { row, column } = editStore.actived
+        if (column && row) {
+          return {
+            row,
+            rowIndex: $xeTable.getRowIndex(row),
+            column,
+            columnIndex: $xeTable.getColumnIndex(column)
+          }
         }
         return null
       },
@@ -501,49 +795,25 @@ hooks.add('tableEditModule', {
        */
       getSelectedCell () {
         const { editStore } = reactData
-        const { args, column } = editStore.selected
-        if (args && column) {
-          return Object.assign({}, args)
+        const { row, column } = editStore.selected
+        if (row && column) {
+          return {
+            row,
+            column
+          }
         }
         return null
       },
-      clearActived (evnt) {
+      clearActived (row) {
         // 即将废弃
-        if (process.env.VUE_APP_VXE_ENV === 'development') {
-          warnLog('vxe.error.delFunc', ['clearActived', 'clearEdit'])
-        }
-        return this.clearEdit(evnt)
+        warnLog('vxe.error.delFunc', ['clearActived', 'clearEdit'])
+        return $xeTable.clearEdit(row)
       },
       /**
        * 清除激活的编辑
        */
-      clearEdit (evnt) {
-        const { editStore } = reactData
-        const { actived, focused } = editStore
-        const { row, column } = actived
-        if (row || column) {
-          syncActivedCell()
-          actived.args = null
-          actived.row = null
-          actived.column = null
-          $xeTable.updateFooter()
-          $xeTable.dispatchEvent('edit-closed', {
-            row,
-            rowIndex: $xeTable.getRowIndex(row),
-            $rowIndex: $xeTable.getVMRowIndex(row),
-            column,
-            columnIndex: $xeTable.getColumnIndex(column),
-            $columnIndex: $xeTable.getVMColumnIndex(column)
-          }, evnt || null)
-        }
-        if (getConfig().cellVaildMode === 'obsolete') {
-          if ($xeTable.clearValidate) {
-            return $xeTable.clearValidate()
-          }
-        }
-        focused.row = null
-        focused.column = null
-        return nextTick()
+      clearEdit (row) {
+        return handleClearEdit(null, row)
       },
       /**
        * 清除所选中源状态
@@ -557,11 +827,9 @@ hooks.add('tableEditModule', {
         return nextTick()
       },
       isActiveByRow (row) {
-        if (process.env.VUE_APP_VXE_ENV === 'development') {
-          warnLog('vxe.error.delFunc', ['isActiveByRow', 'isEditByRow'])
-        }
+        warnLog('vxe.error.delFunc', ['isActiveByRow', 'isEditByRow'])
         // 即将废弃
-        return this.isEditByRow(row)
+        return $xeTable.isEditByRow(row)
       },
       /**
        * 判断行是否为激活编辑状态
@@ -572,9 +840,7 @@ hooks.add('tableEditModule', {
         return editStore.actived.row === row
       },
       setActiveRow (row) {
-        if (process.env.VUE_APP_VXE_ENV === 'development') {
-          warnLog('vxe.error.delFunc', ['setActiveRow', 'setEditRow'])
-        }
+        warnLog('vxe.error.delFunc', ['setActiveRow', 'setEditRow'])
         // 即将废弃
         return editMethods.setEditRow(row)
       },
@@ -584,15 +850,17 @@ hooks.add('tableEditModule', {
       setEditRow (row, fieldOrColumn) {
         const { visibleColumn } = internalData
         let column: any = XEUtils.find(visibleColumn, column => isEnableConf(column.editRender))
+        let isPos = false
         if (fieldOrColumn) {
-          column = XEUtils.isString(fieldOrColumn) ? $xeTable.getColumnByField(fieldOrColumn) : fieldOrColumn
+          isPos = true
+          if (fieldOrColumn !== true) {
+            column = XEUtils.isString(fieldOrColumn) ? $xeTable.getColumnByField(fieldOrColumn) : fieldOrColumn
+          }
         }
-        return $xeTable.setEditCell(row, column)
+        return handleEditCell(row, column, isPos)
       },
       setActiveCell (row, fieldOrColumn) {
-        if (process.env.VUE_APP_VXE_ENV === 'development') {
-          warnLog('vxe.error.delFunc', ['setActiveCell', 'setEditCell'])
-        }
+        warnLog('vxe.error.delFunc', ['setActiveCell', 'setEditCell'])
         // 即将废弃
         return editMethods.setEditCell(row, fieldOrColumn)
       },
@@ -600,26 +868,7 @@ hooks.add('tableEditModule', {
        * 激活单元格编辑
        */
       setEditCell (row, fieldOrColumn) {
-        const { editConfig } = props
-        const column = XEUtils.isString(fieldOrColumn) ? $xeTable.getColumnByField(fieldOrColumn) : fieldOrColumn
-        if (row && column && isEnableConf(editConfig) && isEnableConf(column.editRender)) {
-          return $xeTable.scrollToRow(row, column).then(() => {
-            const cell = $xeTable.getCell(row, column)
-            if (cell) {
-              editPrivateMethods.handleActived({
-                row,
-                rowIndex: $xeTable.getRowIndex(row),
-                column,
-                columnIndex: $xeTable.getColumnIndex(column),
-                cell,
-                $table: $xeTable
-              })
-              internalData._lastCallTime = Date.now()
-            }
-            return nextTick()
-          })
-        }
-        return nextTick()
+        return handleEditCell(row, fieldOrColumn, true)
       },
       /**
        * 只对 trigger=dblclick 有效，选中单元格
@@ -631,7 +880,7 @@ hooks.add('tableEditModule', {
         if (row && column && editOpts.trigger !== 'manual') {
           const rowIndex = $xeTable.findRowIndexOf(tableData, row)
           if (rowIndex > -1 && column) {
-            const cell = $xeTable.getCell(row, column)
+            const cell = $xeTable.getCellElement(row, column)
             const params = {
               row,
               rowIndex,
@@ -650,144 +899,75 @@ hooks.add('tableEditModule', {
       /**
        * 处理激活编辑
        */
-      handleActived (params, evnt) {
-        const { editConfig, mouseConfig } = props
-        const { editStore, tableColumn } = reactData
-        const editOpts = computeEditOpts.value
-        const { mode } = editOpts
-        const { actived, focused } = editStore
-        const { row, column } = params
-        const { editRender } = column
-        const cell = (params.cell || $xeTable.getCell(row, column))
-        const beforeEditMethod = editOpts.beforeEditMethod || editOpts.activeMethod
-        params.cell = cell
-        if (cell && isEnableConf(editConfig) && isEnableConf(editRender)) {
-          // 激活编辑
-          if (!$xeTable.hasPendingByRow(row)) {
-            if (actived.row !== row || (mode === 'cell' ? actived.column !== column : false)) {
-              // 判断是否禁用编辑
-              let type: 'edit-disabled' | 'edit-activated' = 'edit-disabled'
-              if (!beforeEditMethod || beforeEditMethod({ ...params, $table: $xeTable, $grid: $xeTable.xegrid })) {
-                if (mouseConfig) {
-                  editMethods.clearSelected()
-                  if ($xeTable.clearCellAreas) {
-                    $xeTable.clearCellAreas()
-                    $xeTable.clearCopyCellArea()
-                  }
-                }
-                $xeTable.closeTooltip()
-                if (actived.column) {
-                  editMethods.clearEdit(evnt)
-                }
-                type = 'edit-activated'
-                column.renderHeight = cell.offsetHeight
-                actived.args = params
-                actived.row = row
-                actived.column = column
-                if (mode === 'row') {
-                  tableColumn.forEach((column: any) => getEditColumnModel(row, column))
-                } else {
-                  getEditColumnModel(row, column)
-                }
-                const afterEditMethod = editOpts.afterEditMethod
-                nextTick(() => {
-                  editPrivateMethods.handleFocus(params, evnt)
-                  if (afterEditMethod) {
-                    afterEditMethod({ ...params, $table: $xeTable, $grid: $xeTable.xegrid })
-                  }
-                })
-              }
-              $xeTable.dispatchEvent(type, {
-                row,
-                rowIndex: $xeTable.getRowIndex(row),
-                $rowIndex: $xeTable.getVMRowIndex(row),
-                column,
-                columnIndex: $xeTable.getColumnIndex(column),
-                $columnIndex: $xeTable.getVMColumnIndex(column)
-              }, evnt)
-
-              // v4已废弃
-              if (type === 'edit-activated') {
-                $xeTable.dispatchEvent('edit-actived', {
-                  row,
-                  rowIndex: $xeTable.getRowIndex(row),
-                  $rowIndex: $xeTable.getVMRowIndex(row),
-                  column,
-                  columnIndex: $xeTable.getColumnIndex(column),
-                  $columnIndex: $xeTable.getVMColumnIndex(column)
-                }, evnt)
-              }
-            } else {
-              const { column: oldColumn } = actived
-              if (mouseConfig) {
-                editMethods.clearSelected()
-                if ($xeTable.clearCellAreas) {
-                  $xeTable.clearCellAreas()
-                  $xeTable.clearCopyCellArea()
-                }
-              }
-              if (oldColumn !== column) {
-                const { model: oldModel } = oldColumn
-                if (oldModel.update) {
-                  setCellValue(row, oldColumn, oldModel.value)
-                }
-                if ($xeTable.clearValidate) {
-                  $xeTable.clearValidate(row, column)
-                }
-              }
-              column.renderHeight = cell.offsetHeight
-              actived.args = params
-              actived.column = column
-              setTimeout(() => {
-                editPrivateMethods.handleFocus(params, evnt)
-              })
-            }
-            focused.column = null
-            focused.row = null
-            $xeTable.focus()
-          }
-        }
-        return nextTick()
+      handleEdit (params, evnt) {
+        return handleEditActive(params, evnt, true, true)
       },
+      /**
+       * @deprecated
+       */
+      handleActived (params, evnt) {
+        return editPrivateMethods.handleEdit(params, evnt)
+      },
+      /**
+       * 处理取消编辑
+       * @param evnt
+       * @returns
+       */
+      handleClearEdit,
       /**
        * 处理聚焦
        */
       handleFocus (params) {
         const { row, column, cell } = params
         const { editRender } = column
+        const editOpts = computeEditOpts.value
         if (isEnableConf(editRender)) {
           const compRender = renderer.get(editRender.name)
-          let { autofocus, autoselect } = editRender
+          let autoFocus = editRender.autofocus || editRender.autoFocus
+          let autoSelect = editRender.autoSelect || editRender.autoselect
           let inputElem
-          if (!autofocus && compRender) {
-            autofocus = compRender.autofocus
-          }
-          if (!autoselect && compRender) {
-            autoselect = compRender.autoselect
-          }
-          // 如果指定了聚焦 class
-          if (XEUtils.isFunction(autofocus)) {
-            inputElem = autofocus.call(this, params)
-          } else if (autofocus) {
-            inputElem = cell.querySelector(autofocus)
-            if (inputElem) {
-              inputElem.focus()
+          // 是否启用聚焦
+          if (editOpts.autoFocus) {
+            if (!autoFocus && compRender) {
+              autoFocus = compRender.tableAutoFocus || compRender.tableAutofocus || compRender.autofocus
+            }
+            if (!autoSelect && compRender) {
+              autoSelect = compRender.tableAutoSelect || compRender.autoselect
+            }
+            // 如果指定了聚焦 class
+            if (XEUtils.isFunction(autoFocus)) {
+              inputElem = autoFocus(params)
+            } else if (autoFocus) {
+              if (autoFocus === true) {
+                // 自动匹配模式，会自动匹配第一个可输入元素
+                inputElem = cell.querySelector('input,textarea')
+              } else {
+                inputElem = cell.querySelector(autoFocus)
+              }
+              if (inputElem) {
+                inputElem.focus()
+              }
             }
           }
           if (inputElem) {
-            if (autoselect) {
+            if (autoSelect) {
               inputElem.select()
             } else {
               // 保持一致行为，光标移到末端
-              if (browse.msie) {
+              if (browseObj.msie) {
                 const textRange = inputElem.createTextRange()
                 textRange.collapse(false)
                 textRange.select()
               }
             }
           } else {
-            // 显示到可视区中
-            $xeTable.scrollToRow(row, column)
+            // 是否自动定位
+            if (editOpts.autoPos) {
+              if (!column.fixed) {
+                // 显示到可视区中
+                $xeTable.scrollToRow(row, column)
+              }
+            }
           }
         }
       },
@@ -805,8 +985,8 @@ hooks.add('tableEditModule', {
         const selectMethod = () => {
           if (isMouseSelected && (selected.row !== row || selected.column !== column)) {
             if (actived.row !== row || (editOpts.mode === 'cell' ? actived.column !== column : false)) {
-              editMethods.clearEdit(evnt)
-              editMethods.clearSelected()
+              handleClearEdit(evnt)
+              $xeTable.clearSelected()
               if ($xeTable.clearCellAreas) {
                 $xeTable.clearCellAreas()
                 $xeTable.clearCopyCellArea()
@@ -833,7 +1013,7 @@ hooks.add('tableEditModule', {
         const { row, column } = selected
         removeCellSelectedClass()
         if (row && column) {
-          const cell = $xeTable.getCell(row, column)
+          const cell = $xeTable.getCellElement(row, column)
           if (cell) {
             addClass(cell, 'col--selected')
           }
@@ -845,5 +1025,8 @@ hooks.add('tableEditModule', {
   },
   setupGrid ($xeGrid) {
     return $xeGrid.extendTableMethods(tableEditMethodKeys)
+  },
+  setupGantt ($xeGantt) {
+    return $xeGantt.extendTableMethods(tableEditMethodKeys)
   }
 })

@@ -1,7 +1,12 @@
-import { VxeUI } from 'vxe-pc-ui'
+import { VxeUI } from '@vxe-ui/core'
+import { getFuncText } from './src/utils'
 
-VxeUI.version = process.env.VUE_APP_VXE_VERSION as string
-VxeUI.tableVersion = process.env.VUE_APP_VXE_VERSION as string
+import type { VxeUploadDefines, VxePrintDefines, VxeGlobalConfig } from 'vxe-pc-ui'
+
+export const version = process.env.VUE_APP_VXE_VERSION as string
+
+VxeUI.version = version
+VxeUI.tableVersion = version
 
 VxeUI.setConfig({
   emptyCell: '　',
@@ -12,7 +17,7 @@ VxeUI.setConfig({
     animat: true,
     delayHover: 250,
     autoResize: true,
-    minHeight: 144,
+    // minHeight: null,
     // keepSource: false,
     // showOverflow: null,
     // showHeaderOverflow: null,
@@ -31,11 +36,30 @@ VxeUI.setConfig({
     //   keyField: '_X_ROW_KEY' // 行数据的唯一主键字段名
     // },
     resizeConfig: {
-      refreshDelay: 250
+      // refreshDelay: 20
+    },
+    resizableConfig: {
+      dragMode: 'auto',
+      showDragTip: true,
+      isSyncAutoHeight: true,
+      isSyncAutoWidth: true,
+      minHeight: 18
     },
     radioConfig: {
       // trigger: 'default'
       strict: true
+    },
+    rowDragConfig: {
+      showIcon: true,
+      animation: true,
+      showGuidesStatus: true,
+      showDragTip: true
+    },
+    columnDragConfig: {
+      showIcon: true,
+      animation: true,
+      showGuidesStatus: true,
+      showDragTip: true
     },
     checkboxConfig: {
       // trigger: 'default',
@@ -44,28 +68,74 @@ VxeUI.setConfig({
     tooltipConfig: {
       enterable: true
     },
+    headerTooltipConfig: {
+      enterable: true
+    },
+    footerTooltipConfig: {
+      enterable: true
+    },
     validConfig: {
-      showMessage: true,
+      showErrorMessage: true,
       autoClear: true,
       autoPos: true,
       message: 'inline',
-      msgMode: 'single'
+      msgMode: 'single',
+      theme: 'beautify'
     },
     columnConfig: {
+      autoOptions: {
+        isCalcHeader: true,
+        isCalcBody: true,
+        isCalcFooter: true
+      },
       maxFixedSize: 4
     },
-    // menuConfig: {
-    //   visibleMethod () {}
-    // },
+    cellConfig: {
+      padding: true
+    },
+    headerCellConfig: {
+      height: 'unset'
+    },
+    footerCellConfig: {
+      height: 'unset'
+    },
+    menuConfig: {
+      // visibleMethod () {},
+      // transfer: false,
+      destroyOnClose: true
+    },
     customConfig: {
+      // enabled: false,
       allowVisible: true,
       allowResizable: true,
       allowFixed: true,
       allowSort: true,
       showFooter: true,
-      placement: 'top-right'
+      placement: 'top-right',
       //  storage: false,
-      //  checkMethod () {}
+      storeOptions: {
+        visible: true,
+        resizable: true,
+        sort: true,
+        fixed: true
+        // rowGroup: false,
+        // aggFunc: false
+      },
+      // autoAggGroupValues: false,
+      //  checkMethod () {},
+      modalOptions: {
+        showMaximize: true,
+        mask: true,
+        lockView: true,
+        resize: true,
+        escClosable: true
+      },
+      drawerOptions: {
+        mask: true,
+        lockView: true,
+        escClosable: true,
+        resize: true
+      }
     },
     sortConfig: {
       // remote: false,
@@ -73,30 +143,54 @@ VxeUI.setConfig({
       // orders: ['asc', 'desc', null],
       // sortMethod: null,
       showIcon: true,
+      allowClear: true,
+      allowBtn: true,
       iconLayout: 'vertical'
     },
     filterConfig: {
       // remote: false,
       // filterMethod: null,
+      // isEvery: false,
+      // transfer: false,
+      destroyOnClose: true,
+      multiple: true,
       showIcon: true
     },
+    floatingFilterConfig: {
+      // enabled: false
+    },
+    aggregateConfig: {
+      padding: true,
+      rowField: 'id',
+      parentField: '_X_ROW_PARENT_KEY',
+      childrenField: '_X_ROW_CHILDREN',
+      mapChildrenField: '_X_ROW_CHILD_LIST',
+      indent: 20,
+      showIcon: true,
+      maxGroupSize: 4,
+      showAggFuncTitle: true
+    },
     treeConfig: {
+      padding: true,
       rowField: 'id',
       parentField: 'parentId',
       childrenField: 'children',
       hasChildField: 'hasChild',
       mapChildrenField: '_X_ROW_CHILD',
       indent: 20,
-      showIcon: true
+      showIcon: true,
+      showRootLine: true
     },
     expandConfig: {
       // trigger: 'default',
-      showIcon: true
+      showIcon: true,
+      mode: 'fixed'
     },
     editConfig: {
       // mode: 'cell',
       showIcon: true,
-      showAsterisk: true
+      showAsterisk: true,
+      autoFocus: true
     },
     importConfig: {
       _typeMaps: {
@@ -104,8 +198,7 @@ VxeUI.setConfig({
         html: 1,
         xml: 1,
         txt: 1
-      },
-      modes: ['insert', 'covering']
+      }
     },
     exportConfig: {
       _typeMaps: {
@@ -113,21 +206,27 @@ VxeUI.setConfig({
         html: 1,
         xml: 1,
         txt: 1
-      },
-      modes: ['current', 'selected']
+      }
     },
     printConfig: {
-      modes: ['current', 'selected']
     },
     mouseConfig: {
       extension: true
     },
     keyboardConfig: {
+      isAll: true,
       isEsc: true
     },
     areaConfig: {
       autoClear: true,
-      selectCellByHeader: true
+      selectCellByHeader: true,
+      selectCellByBody: true,
+      extendDirection: {
+        top: true,
+        left: true,
+        bottom: true,
+        right: true
+      }
     },
     clipConfig: {
       isCopy: true,
@@ -138,20 +237,35 @@ VxeUI.setConfig({
       isFind: true,
       isReplace: true
     },
-    scrollX: {
+    virtualXConfig: {
       // enabled: false,
-      gt: 60
-      // oSize: 0
+      gt: 24,
+      preSize: 1,
+      oSize: 0
     },
-    scrollY: {
+    virtualYConfig: {
       // enabled: false,
-      gt: 100
-      // oSize: 0
+      // mode: 'wheel',
+      gt: 100,
+      preSize: 1,
+      oSize: 0
+    },
+    scrollbarConfig: {
+      // width: 14,
+      // height: 14,
+      x: {
+        // position: 'bottom',
+        visible: true
+      },
+      y: {
+        // position: 'right',
+        visible: true
+      }
+    },
+    undoHistoryConfig: {
+      isEditRow: true
     }
   },
-  // export: {
-  //   types: {}
-  // },
   grid: {
     // size: null,
     // zoomConfig: {
@@ -171,11 +285,14 @@ VxeUI.setConfig({
     proxyConfig: {
       enabled: true,
       autoLoad: true,
-      message: true,
-      props: {
-        list: null,
+      showLoading: true,
+      showResponseMsg: true,
+      showActionMsg: true,
+      response: {
+        list: 'list',
         result: 'result',
         total: 'page.total',
+        footerData: 'footerData',
         message: 'message'
       }
       // beforeItem: null,
@@ -197,10 +314,12 @@ VxeUI.setConfig({
     //   types: ['csv', 'html', 'xml', 'txt']
     // },
     // buttons: []
-  }
+  },
+
+  gantt: {}
 })
 
-const iconPrefix = 'vxe-icon-'
+const iconPrefix = 'vxe-table-icon-'
 
 VxeUI.setIcon({
   // table
@@ -220,9 +339,27 @@ VxeUI.setIcon({
   TABLE_CHECKBOX_CHECKED: iconPrefix + 'checkbox-checked-fill',
   TABLE_CHECKBOX_UNCHECKED: iconPrefix + 'checkbox-unchecked',
   TABLE_CHECKBOX_INDETERMINATE: iconPrefix + 'checkbox-indeterminate-fill',
+  TABLE_CHECKBOX_DISABLED_UNCHECKED: iconPrefix + 'checkbox-unchecked-fill',
   TABLE_RADIO_CHECKED: iconPrefix + 'radio-checked-fill',
   TABLE_RADIO_UNCHECKED: iconPrefix + 'radio-unchecked',
+  TABLE_RADIO_DISABLED_UNCHECKED: iconPrefix + 'radio-unchecked-fill',
   TABLE_CUSTOM_SORT: iconPrefix + 'drag-handle',
+  TABLE_MENU_OPTIONS: iconPrefix + 'arrow-right',
+  TABLE_MENU_OPTION_LOADING: iconPrefix + 'repeat roll',
+  TABLE_DRAG_ROW: iconPrefix + 'drag-handle',
+  TABLE_DRAG_COLUMN: iconPrefix + 'drag-handle',
+  TABLE_DRAG_STATUS_ROW: iconPrefix + 'sort',
+  TABLE_DRAG_STATUS_SUB_ROW: iconPrefix + 'add-sub',
+  TABLE_DRAG_STATUS_AGG_GROUP: iconPrefix + 'grouping',
+  TABLE_DRAG_STATUS_AGG_VALUES: iconPrefix + 'values',
+  TABLE_DRAG_STATUS_COLUMN: iconPrefix + 'swap',
+  TABLE_DRAG_DISABLED: iconPrefix + 'no-drop',
+  TABLE_ROW_GROUP_OPEN: iconPrefix + 'arrow-right rotate90',
+  TABLE_ROW_GROUP_CLOSE: iconPrefix + 'arrow-right',
+  TABLE_AGGREGATE_GROUPING: iconPrefix + 'grouping',
+  TABLE_AGGREGATE_VALUES: iconPrefix + 'values',
+  TABLE_AGGREGATE_SORT: iconPrefix + 'drag-handle',
+  TABLE_AGGREGATE_DELETE: iconPrefix + 'close',
 
   // toolbar
   TOOLBAR_TOOLS_REFRESH: iconPrefix + 'repeat',
@@ -267,22 +404,34 @@ export const use = VxeUI.use
  * 已废弃
  * @deprecated
  */
-export const setup = VxeUI.setup
+export const setup = (options?: VxeGlobalConfig) => {
+  return VxeUI.setConfig(options)
+}
+VxeUI.setup = setup
 /**
  * 已废弃
  * @deprecated
  */
-export const config = VxeUI.config
+export const config = (options?: VxeGlobalConfig) => {
+  return VxeUI.setConfig(options)
+}
+VxeUI.config = config
 /**
  * 已废弃
  * @deprecated
  */
-export const t = VxeUI.t
+export const t = (key: string, args?: any) => {
+  return VxeUI.getI18n(key, args)
+}
+VxeUI.t = t
 /**
  * 已废弃
  * @deprecated
  */
-export const _t = VxeUI._t
+export const _t = (content: string | number | boolean | null | undefined, args?: any) => {
+  return getFuncText(content, args)
+}
+VxeUI._t = _t
 
 /**
  * 已废弃，兼容老版本
@@ -290,8 +439,82 @@ export const _t = VxeUI._t
  */
 export const VXETable = VxeUI
 
-export const saveFile = VxeUI.readFile
-export const readFile = VxeUI.readFile
+/**
+ * 已废弃，兼容老版本
+ * @deprecated
+ */
+export const saveFile: VxeUploadDefines.SaveFileFunction = (options) => {
+  return VxeUI.saveFile(options)
+}
+/**
+ * 已废弃，兼容老版本
+ * @deprecated
+ */
+export const readFile: VxeUploadDefines.ReadFileFunction = (options) => {
+  return VxeUI.readFile(options)
+}
+/**
+ * 已废弃，兼容老版本
+ * @deprecated
+ */
+export const print: VxePrintDefines.PrintFunction = (options) => {
+  return VxeUI.print(options)
+}
+/**
+ * 已废弃，兼容老版本
+ * @deprecated
+ */
+export const modal = {
+  /**
+   * 已废弃，兼容老版本
+   * @deprecated
+   */
+  get (id: any) {
+    return VxeUI.modal.get(id)
+  },
+  /**
+   * 已废弃，兼容老版本
+   * @deprecated
+   */
+  close (id: any) {
+    return VxeUI.modal.close(id)
+  },
+  /**
+   * 已废弃，兼容老版本
+   * @deprecated
+   */
+  open (options: any) {
+    return VxeUI.modal.open(options)
+  },
+  /**
+   * 已废弃，兼容老版本
+   * @deprecated
+   */
+  alert (content: any, title: any, options: any) {
+    return VxeUI.modal.alert(content, title, options)
+  },
+  /**
+   * 已废弃，兼容老版本
+   * @deprecated
+   */
+  confirm (content: any, title: any, options: any) {
+    return VxeUI.modal.confirm(content, title, options)
+  },
+  /**
+   * 已废弃，兼容老版本
+   * @deprecated
+   */
+  message (content: any, options: any) {
+    return VxeUI.modal.message(content, options)
+  },
+  /**
+   * 已废弃，兼容老版本
+   * @deprecated
+   */
+  notification (content: any, title: any, options: any) {
+    return VxeUI.modal.notification(content, title, options)
+  }
+}
 
 export {
   VxeUI

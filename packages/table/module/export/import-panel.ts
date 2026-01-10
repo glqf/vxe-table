@@ -1,19 +1,31 @@
-import { defineComponent, h, ref, Ref, computed, inject, reactive, nextTick, resolveComponent } from 'vue'
+import { h, ref, Ref, computed, inject, reactive, nextTick, PropType } from 'vue'
+import { defineVxeComponent } from '../../../ui/src/comp'
 import { VxeUI } from '../../../ui'
 import XEUtils from 'xe-utils'
 import { parseFile } from '../../../ui/src/utils'
+import { errLog } from '../../../ui/src/log'
 
-import type { VxeTablePrivateMethods, VxeTableConstructor, VxeTableMethods, VxeButtonComponent, VxeModalComponent, VxeRadioGroupComponent, VxeRadioComponent } from '../../../../types'
+import type { VxeTablePrivateMethods, VxeTableConstructor, VxeTableMethods, VxeTableDefines } from '../../../../types'
 
-const { getI18n, getIcon } = VxeUI
+const { getI18n, getIcon, renderEmptyElement } = VxeUI
 
-export default defineComponent({
+export default defineVxeComponent({
   name: 'VxeTableImportPanel',
   props: {
-    defaultOptions: Object as any,
-    storeData: Object as any
+    defaultOptions: {
+      type: Object as PropType<VxeTableDefines.ImportParamsObj>,
+      default: () => ({} as VxeTableDefines.ImportParamsObj)
+    },
+    storeData: {
+      type: Object as PropType<VxeTableDefines.ImportStoreObj>,
+      default: () => ({} as VxeTableDefines.ImportStoreObj)
+    }
   },
   setup (props) {
+    const VxeUIModalComponent = VxeUI.getComponent('VxeModal')
+    const VxeUIButtonComponent = VxeUI.getComponent('VxeButton')
+    const VxeUISelectComponent = VxeUI.getComponent('VxeSelect')
+
     const $xeTable = inject('$xeTable', {} as VxeTableConstructor & VxeTableMethods & VxeTablePrivateMethods)
     const { computeImportOpts } = $xeTable.getComputeMaps()
 
@@ -38,9 +50,9 @@ export default defineComponent({
       const { type, typeList } = storeData
       if (type) {
         const selectItem = XEUtils.find(typeList, item => type === item.value)
-        return selectItem ? getI18n(selectItem.label) : '*.*'
+        return `${selectItem ? selectItem.label : '*.*'}`
       }
-      return `*.${typeList.map((item: any) => item.value).join(', *.')}`
+      return `*.${typeList.map((item) => item.value).join(', *.')}`
     })
 
     const clearFileEvent = () => {
@@ -54,10 +66,10 @@ export default defineComponent({
 
     const selectFileEvent = () => {
       const { storeData, defaultOptions } = props
-      $xeTable.readFile(defaultOptions).then((params: any) => {
+      $xeTable.readFile(defaultOptions).then((params) => {
         const { file } = params
         Object.assign(storeData, parseFile(file), { file })
-      }).catch((e: any) => e)
+      }).catch(() => {})
     }
 
     const showEvent = () => {
@@ -87,94 +99,167 @@ export default defineComponent({
     }
 
     const renderVN = () => {
+      const $xeGrid = $xeTable.xeGrid
+      const $xeGantt = $xeTable.xeGantt
+
       const { defaultOptions, storeData } = props
       const selectName = computeSelectName.value
       const hasFile = computeHasFile.value
       const parseTypeLabel = computeParseTypeLabel.value
-      return h(resolveComponent('vxe-modal') as VxeModalComponent, {
-        modelValue: storeData.visible,
-        title: getI18n('vxe.import.impTitle'),
-        className: 'vxe-table-import-popup-wrapper',
-        width: 440,
-        mask: true,
-        lockView: true,
-        showFooter: false,
-        escClosable: true,
-        maskClosable: true,
-        loading: reactData.loading,
-        'onUpdate:modelValue' (value: any) {
-          storeData.visible = value
-        },
-        onShow: showEvent
-      }, {
-        default: () => {
-          return h('div', {
-            class: 'vxe-export--panel'
-          }, [
-            h('table', {
-              cellspacing: 0,
-              cellpadding: 0,
-              border: 0
+      const slots = defaultOptions.slots || {}
+      const topSlot = slots.top
+      const bottomSlot = slots.bottom
+      const defaultSlot = slots.default
+      const footerSlot = slots.footer
+      return VxeUIModalComponent
+        ? h(VxeUIModalComponent, {
+          id: 'VXE_IMPORT_MODAL',
+          modelValue: storeData.visible,
+          title: getI18n('vxe.import.impTitle'),
+          className: 'vxe-table-export-popup-wrapper',
+          width: 540,
+          minWidth: 360,
+          minHeight: 240,
+          mask: true,
+          lockView: true,
+          showFooter: true,
+          escClosable: true,
+          maskClosable: true,
+          showMaximize: true,
+          resize: true,
+          loading: reactData.loading,
+          'onUpdate:modelValue' (value: any) {
+            storeData.visible = value
+          },
+          onShow: showEvent
+        }, {
+          default: () => {
+            const params = {
+              $table: $xeTable,
+              $grid: $xeGrid,
+              $gantt: $xeGantt,
+              options: defaultOptions,
+              params: defaultOptions.params as any
+            }
+            return h('div', {
+              class: 'vxe-table-export--panel'
             }, [
-              h('tbody', [
-                h('tr', [
-                  h('td', getI18n('vxe.import.impFile')),
-                  h('td', [
-                    hasFile
-                      ? h('div', {
-                        class: 'vxe-import-selected--file',
-                        title: selectName
-                      }, [
-                        h('span', selectName),
-                        h('i', {
-                          class: getIcon().INPUT_CLEAR,
-                          onClick: clearFileEvent
-                        })
+              topSlot
+                ? h('div', {
+                  class: 'vxe-table-export--panel-top'
+                }, $xeTable.callSlot(topSlot, params))
+                : renderEmptyElement($xeTable),
+              h('div', {
+                class: 'vxe-table-export--panel-body'
+              }, defaultSlot
+                ? $xeTable.callSlot(defaultSlot, params)
+                : [
+                    h('table', {
+                      class: 'vxe-table-export--panel-table',
+                      cellspacing: 0,
+                      cellpadding: 0,
+                      border: 0
+                    }, [
+                      h('tbody', [
+                        h('tr', [
+                          h('td', getI18n('vxe.import.impFile')),
+                          h('td', [
+                            hasFile
+                              ? h('div', {
+                                class: 'vxe-table-export--selected--file',
+                                title: selectName
+                              }, [
+                                h('span', selectName),
+                                h('i', {
+                                  class: getIcon().INPUT_CLEAR,
+                                  onClick: clearFileEvent
+                                })
+                              ])
+                              : h('button', {
+                                ref: refFileBtn,
+                                class: 'vxe-table-export--select--file',
+                                onClick: selectFileEvent
+                              }, getI18n('vxe.import.impSelect'))
+                          ])
+                        ]),
+                        h('tr', [
+                          h('td', getI18n('vxe.import.impType')),
+                          h('td', parseTypeLabel)
+                        ]),
+                        h('tr', [
+                          h('td', getI18n('vxe.import.impMode')),
+                          h('td', [
+                            VxeUISelectComponent
+                              ? h(VxeUISelectComponent, {
+                                modelValue: defaultOptions.mode,
+                                options: storeData.modeList,
+                                'onUpdate:modelValue' (value: any) {
+                                  defaultOptions.mode = value
+                                }
+                              })
+                              : renderEmptyElement($xeTable)
+                          ])
+                        ])
                       ])
-                      : h('button', {
-                        ref: refFileBtn,
-                        class: 'vxe-import-select--file',
-                        onClick: selectFileEvent
-                      }, getI18n('vxe.import.impSelect'))
-                  ])
-                ]),
-                h('tr', [
-                  h('td', getI18n('vxe.import.impType')),
-                  h('td', parseTypeLabel)
-                ]),
-                h('tr', [
-                  h('td', getI18n('vxe.import.impOpts')),
-                  h('td', [
-                    h(resolveComponent('vxe-radio-group') as VxeRadioGroupComponent, {
-                      modelValue: defaultOptions.mode,
-                      'onUpdate:modelValue' (value: any) {
-                        defaultOptions.mode = value
-                      }
-                    }, {
-                      default: () => storeData.modeList.map((item: any) => h(resolveComponent('vxe-radio') as VxeRadioComponent, { label: item.value, content: getI18n(item.label) }))
-                    })
-                  ])
-                ])
-              ])
-            ]),
-            h('div', {
-              class: 'vxe-export--panel-btns'
-            }, [
-              h(resolveComponent('vxe-button') as VxeButtonComponent, {
-                content: getI18n('vxe.import.impCancel'),
-                onClick: cancelEvent
-              }),
-              h(resolveComponent('vxe-button') as VxeButtonComponent, {
-                status: 'primary',
-                disabled: !hasFile,
-                content: getI18n('vxe.import.impConfirm'),
-                onClick: importEvent
-              })
+                    ])
+                  ]
+              ),
+              bottomSlot
+                ? h('div', {
+                  class: 'vxe-table-export--panel-bottom'
+                }, $xeTable.callSlot(bottomSlot, params))
+                : renderEmptyElement($xeTable)
             ])
-          ])
-        }
-      })
+          },
+          footer () {
+            const params = {
+              $table: $xeTable,
+              $grid: $xeGrid,
+              $gantt: $xeGantt,
+              options: defaultOptions,
+              params: defaultOptions.params as any
+            }
+            return h('div', {
+              class: 'vxe-table-export--panel-footer'
+            }, footerSlot
+              ? $xeTable.callSlot(footerSlot, params)
+              : [
+                  h('div', {
+                    class: 'vxe-table-export--panel-btns'
+                  }, [
+                    VxeUIButtonComponent
+                      ? h(VxeUIButtonComponent, {
+                        content: getI18n('vxe.import.impCancel'),
+                        onClick: cancelEvent
+                      })
+                      : renderEmptyElement($xeTable),
+                    VxeUIButtonComponent
+                      ? h(VxeUIButtonComponent, {
+                        status: 'primary',
+                        disabled: !hasFile || reactData.loading,
+                        content: getI18n('vxe.import.impConfirm'),
+                        onClick: importEvent
+                      })
+                      : renderEmptyElement($xeTable)
+                  ])
+                ]
+            )
+          }
+        })
+        : renderEmptyElement($xeTable)
     }
+
+    nextTick(() => {
+      if (!VxeUIModalComponent) {
+        errLog('vxe.error.reqComp', ['vxe-modal'])
+      }
+      if (!VxeUIButtonComponent) {
+        errLog('vxe.error.reqComp', ['vxe-button'])
+      }
+      if (!VxeUISelectComponent) {
+        errLog('vxe.error.reqComp', ['vxe-select'])
+      }
+    })
 
     return renderVN
   }

@@ -1,127 +1,106 @@
 <template>
   <div>
-    <vxe-toolbar ref="toolbarRef" custom></vxe-toolbar>
-
-    <vxe-table
-      border
-      stripe
-      resizable
-      highlight-hover-row
-      height="400"
-      ref="tableRef"
-      id="bbbbb"
-      :custom-config="{storage:true}"
-      :loading="demo1.loading"
-      :expand-config="{iconOpen: 'vxe-icon-question-circle-fill', iconClose: 'vxe-icon-question-circle-fill'}"
-      :checkbox-config="{labelField: 'id', highlight: true, range: true}"
-      :data="demo1.tableData">
-      <vxe-column type="seq" width="60"></vxe-column>
-      <vxe-column type="checkbox" title="ID" width="140"></vxe-column>
-      <vxe-colgroup title="分组1">
-        <vxe-column type="expand" field="role" title="Role">
-          <template #content="{ row }">
-            <div>{{ row.name }}</div>
-          </template>
-        </vxe-column>
-        <vxe-column field="name" title="Name" sortable></vxe-column>
-      </vxe-colgroup>
-      <vxe-column field="name1" title="Name1" sortable></vxe-column>
-      <vxe-column field="sex" title="Sex" :filters="demo1.sexList" :filter-multiple="false" :formatter="formatterSex"></vxe-column>
-      <vxe-column
-        field="age"
-        title="Age"
-        sortable
-        :filters="demo1.ageOptions"
-        :filter-method="filterAgeMethod"></vxe-column>
-      <vxe-column field="address" title="Address" show-overflow></vxe-column>
-    </vxe-table>
+    <vxe-grid v-bind="gridOptions"></vxe-grid>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, reactive, nextTick } from 'vue'
-import { VxeColumnPropTypes, VxeTableInstance, VxeToolbarInstance } from '../../../types'
+import { reactive } from 'vue'
+import type { VxeGridProps } from '../../../types'
 
 interface RowVO {
-  [key: string]: any
+  id: number
+  name: string
+  type: string
+  size: number
+  date: string
+  children?: RowVO[]
 }
 
-const tableRef = ref<VxeTableInstance<RowVO>>()
-const toolbarRef = ref<VxeToolbarInstance>()
-
-const demo1 = reactive({
-  loading: false,
-  tableData: [] as any[],
-  sexList: [
-    { label: '女', value: '0' },
-    { label: '男', value: '1' }
+const gridOptions = reactive<VxeGridProps<RowVO>>({
+  border: true,
+  treeConfig: {
+    rowField: 'id',
+    childrenField: 'children',
+    showLine: true
+  },
+  columns: [
+    { type: 'seq', width: 70 },
+    { field: 'name', title: 'Name', minWidth: 300, treeNode: true },
+    { field: 'size', title: 'Size' },
+    { field: 'type', title: 'Type' },
+    { field: 'date', title: 'Date' }
   ],
-  ageOptions: [
-    { label: '大于16岁', value: 16 },
-    { label: '大于26岁', value: 26 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 },
-    { label: '大于30岁', value: 30 }
+  data: [
+    { id: 10000, name: 'Test1', type: 'mp3', size: 1024, date: '2020-08-01' },
+    {
+      id: 10050,
+      name: 'Test2',
+      type: 'mp4',
+      size: 0,
+      date: '2021-04-01',
+      children: [
+        {
+          id: 24300,
+          name: 'Test3',
+          type: 'avi',
+          size: 1024,
+          date: '2020-03-01',
+          children: [
+            { id: 20045, name: 'Test4', type: 'html', size: 600, date: '2021-04-01' },
+            {
+              id: 10053,
+              name: 'Test5',
+              type: 'avi',
+              size: 0,
+              date: '2021-04-01',
+              children: [
+                { id: 24330, name: 'Test6', type: 'txt', size: 25, date: '2021-10-01' },
+                { id: 21011, name: 'Test7', type: 'pdf', size: 512, date: '2020-01-01' },
+                { id: 22200, name: 'Test8', type: 'js', size: 1024, date: '2021-06-01' }]
+            }
+          ]
+        }]
+    },
+    {
+      id: 23666,
+      name: 'Test9',
+      type: 'xlsx',
+      size: 2048,
+      date: '2020-11-01',
+      children: [
+        {
+          id: 23677,
+          name: 'Test10',
+          type: 'js',
+          size: 1024,
+          date: '2021-06-01',
+          children: [
+            { id: 23671, name: 'Test11', type: 'js', size: 1024, date: '2021-06-01' },
+            { id: 23672, name: 'Test12', type: 'js', size: 1024, date: '2021-06-01' }]
+        },
+        {
+          id: 23688,
+          name: 'Test13',
+          type: 'js',
+          size: 1024,
+          date: '2021-06-01',
+          children: [
+            { id: 23681, name: 'Test14', type: 'js', size: 1024, date: '2021-06-01' },
+            { id: 23682, name: 'Test15', type: 'js', size: 1024, date: '2021-06-01' }]
+        }
+      ]
+    },
+    {
+      id: 24555,
+      name: 'Test16',
+      type: 'avi',
+      size: 224,
+      date: '2020-10-01',
+      children: [
+        { id: 24566, name: 'Test17', type: 'js', size: 1024, date: '2021-06-01' },
+        { id: 24577, name: 'Test18', type: 'js', size: 1024, date: '2021-06-01' }]
+    }
   ]
-})
-
-const formatterSex: VxeColumnPropTypes.Formatter = ({ cellValue }) => {
-  const item = demo1.sexList.find(item => item.value === cellValue)
-  return item ? item.label : ''
-}
-
-const filterAgeMethod: VxeColumnPropTypes.FilterMethod = ({ value, row }) => {
-  return row.age >= value
-}
-
-onMounted(() => {
-  demo1.loading = true
-  setTimeout(() => {
-    demo1.tableData = [
-      { id: 10001, name: 'Test1', role: 'Develop', sex: '0', age: 28, address: 'test abc' },
-      { id: 10002, name: 'Test2', role: 'Test', sex: '1', age: 22, address: 'Guangzhou' },
-      { id: 10003, name: 'Test3', role: 'PM', sex: '0', age: 32, address: 'Shanghai' },
-      { id: 10004, name: 'Test4', role: 'Designer', sex: '1', age: 23, address: 'test abc' },
-      { id: 10005, name: 'Test5', role: 'Develop', sex: '1', age: 30, address: 'Shanghai' },
-      { id: 10006, name: 'Test6', role: 'Designer', sex: '1', age: 21, address: 'test abc' },
-      { id: 10007, name: 'Test7', role: 'Test', sex: '0', age: 29, address: 'test abc' },
-      { id: 10008, name: 'Test8', role: 'Develop', sex: '0', age: 35, address: 'test abc' },
-      { id: 10009, name: 'Test9', role: 'Test', sex: '1', age: 21, address: 'test abc' },
-      { id: 10010, name: 'Test10', role: 'Develop', sex: '0', age: 28, address: 'test abc' },
-      { id: 10011, name: 'Test11', role: 'Test', sex: '0', age: 29, address: 'test abc' },
-      { id: 10012, name: 'Test12', role: 'Develop', sex: '1', age: 27, address: 'test abc' },
-      { id: 10013, name: 'Test13', role: 'Test', sex: '0', age: 24, address: 'test abc' },
-      { id: 10014, name: 'Test14', role: 'Develop', sex: '1', age: 34, address: 'test abc' },
-      { id: 10015, name: 'Test15', role: 'Test', sex: '1', age: 21, address: 'test abc' },
-      { id: 10016, name: 'Test16', role: 'Develop', sex: '0', age: 20, address: 'test abc' },
-      { id: 10017, name: 'Test17', role: 'Test', sex: '1', age: 31, address: 'test abc' },
-      { id: 10018, name: 'Test18', role: 'Develop', sex: '0', age: 32, address: 'test abc' },
-      { id: 10019, name: 'Test19', role: 'Test', sex: '1', age: 37, address: 'test abc' },
-      { id: 10020, name: 'Test20', role: 'Develop', sex: '1', age: 41, address: 'test abc' }
-    ]
-    demo1.loading = false
-  }, 100)
-})
-
-nextTick(() => {
-  // 将表格和工具栏进行关联
-  const $table = tableRef.value
-  const $toolbar = toolbarRef.value
-  if ($table && $toolbar) {
-    $table.connect($toolbar)
-  }
 })
 </script>

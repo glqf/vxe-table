@@ -1,6 +1,6 @@
 <template>
   <div>
-    <vxe-toolbar ref="toolbarRef" print custom></vxe-toolbar>
+    <vxe-toolbar ref="toolbarRef" print export import custom></vxe-toolbar>
 
     <vxe-table
       border
@@ -10,15 +10,21 @@
       height="400"
       ref="tableRef"
       id="aaaa"
+      :row-config="rowConfig"
+      :column-config="{useKey: true}"
+      :column-drag-config="{isCrossDrag:true,isToChildDrag:true,isSelfToChildDrag:true}"
+      :resizable-config="resizableConfig"
       :print-config="{}"
-      :custom-config="{mode: 'popup',storage:true}"
+      :import-config="{}"
+      :export-config="{}"
+      :custom-config="{mode: 'popup',immediate: false}"
       :loading="demo1.loading"
       :expand-config="{iconOpen: 'vxe-icon-question-circle-fill', iconClose: 'vxe-icon-question-circle-fill'}"
       :checkbox-config="{labelField: 'id', highlight: true, range: true}"
       :data="demo1.tableData">
-      <vxe-column type="seq" width="60"></vxe-column>
-      <vxe-column type="checkbox" title="ID" width="140"></vxe-column>
-      <vxe-colgroup title="分组1">
+      <vxe-column field="seq" type="seq" width="60" row-resize></vxe-column>
+      <vxe-column field="checkbox" type="checkbox" title="ID" width="140"></vxe-column>
+      <vxe-colgroup title="分组1" field="g1">
         <vxe-column type="expand" field="role" title="Role">
           <template #content="{ row }">
             <div>{{ row.name }}</div>
@@ -26,7 +32,8 @@
         </vxe-column>
         <vxe-column field="name" title="Name" sortable></vxe-column>
       </vxe-colgroup>
-      <vxe-column field="sex11" title="Sex11" :visible="false"></vxe-column>
+      <vxe-column field="Sex222" title="<span style='color:red;'>Sex222</span>" type="html"></vxe-column>
+      <vxe-column field="Sex1111" title="<span style='color:red;'>Sex1111</span>" type="html" :visible="false"></vxe-column>
       <vxe-column field="sex" title="Sex" :filters="demo1.sexList" :filter-multiple="false" :formatter="formatterSex"></vxe-column>
       <vxe-column
         field="age"
@@ -41,7 +48,7 @@
 
 <script lang="ts" setup>
 import { onMounted, ref, reactive, nextTick } from 'vue'
-import { VxeColumnPropTypes, VxeTableInstance, VxeToolbarInstance } from '../../../types'
+import { VxeColumnPropTypes, VxeTableInstance, VxeToolbarInstance, VxeTablePropTypes } from '../../../types'
 
 interface RowVO {
   [key: string]: any
@@ -49,6 +56,17 @@ interface RowVO {
 
 const tableRef = ref<VxeTableInstance<RowVO>>()
 const toolbarRef = ref<VxeToolbarInstance>()
+
+const rowConfig = reactive<VxeTablePropTypes.RowConfig>({
+  useKey: true,
+  resizable: true
+})
+
+const resizableConfig = reactive<VxeTablePropTypes.ResizableConfig>({
+  isAllColumnDrag: true,
+  isAllRowDrag: true,
+  isDblclickAutoHeight: true
+})
 
 const demo1 = reactive({
   loading: false,

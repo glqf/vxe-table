@@ -1,5 +1,3 @@
-@import '../helpers/mixin.scss';
-
 /*toolbar*/
 .vxe-toolbar {
   position: relative;
@@ -70,10 +68,6 @@
     display: flex;
     align-items: center;
   }
-  .vxe-buttons--wrapper,
-  .vxe-tools--wrapper {
-    flex-wrap: wrap;
-  }
   .vxe-tools--operate {
     flex-shrink: 0;
   }
@@ -85,6 +79,26 @@
         border-radius: 50%;
       }
     }
+  }
+  .vxe-button--item-wrapper,
+  .vxe-tool--item-wrapper {
+    flex-grow: 1;
+  }
+  .vxe-button--prefix-wrapper,
+  .vxe-button--suffix-wrapper,
+  .vxe-tool--prefix-wrapper,
+  .vxe-tool--suffix-wrapper {
+    flex-shrink: 0;
+  }
+  .vxe-button--item-wrapper,
+  .vxe-tool--item-wrapper,
+  .vxe-button--prefix-wrapper,
+  .vxe-button--suffix-wrapper,
+  .vxe-tool--prefix-wrapper,
+  .vxe-tool--suffix-wrapper {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
   }
 }
 

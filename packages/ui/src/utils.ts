@@ -1,6 +1,8 @@
 import XEUtils from 'xe-utils'
-import { VxeUI } from 'vxe-pc-ui'
+import { VxeUI } from '@vxe-ui/core'
 import DomZIndex from 'dom-zindex'
+
+const { getConfig } = VxeUI
 
 export function isEnableConf (conf: any): boolean {
   return conf && conf.enabled !== false
@@ -30,16 +32,16 @@ export function hasChildrenList (item: any) {
   return item && item.children && item.children.length > 0
 }
 
-export function getFuncText (content?: string | number | boolean | null) {
-  if (content) {
-    const translate = VxeUI.getConfig().translate
-    return XEUtils.toValueString(translate ? translate('' + content) : content)
+export function getFuncText (content?: string | number | boolean | null, args?: any) {
+  if (XEUtils.eqNull(content)) {
+    return ''
   }
-  return ''
+  const translate = getConfig().translate
+  return `${translate ? translate('' + content, args) : content}`
 }
 
 export function formatText (value: any, placeholder?: any) {
-  return '' + (isEmptyValue(value) ? (placeholder ? VxeUI.getConfig().emptyCell : '') : value)
+  return '' + (isEmptyValue(value) ? (placeholder ? getConfig().emptyCell : '') : value)
 }
 
 /**
@@ -47,4 +49,8 @@ export function formatText (value: any, placeholder?: any) {
  */
 export function eqEmptyValue (cellValue: any) {
   return cellValue === '' || XEUtils.eqNull(cellValue)
+}
+
+export function getDefaultConfig (val1: any, def1: any) {
+  return XEUtils.eqNull(val1) ? def1 : val1
 }
